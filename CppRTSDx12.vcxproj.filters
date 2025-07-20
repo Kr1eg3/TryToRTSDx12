@@ -1,0 +1,72 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Source Files\Core">
+      <UniqueIdentifier>{43ab07ac-e5b1-47e4-9858-75d5c6a58ced}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Core\Utilities">
+      <UniqueIdentifier>{130063d1-2a45-44bd-ba78-e4c355d2a501}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Platform">
+      <UniqueIdentifier>{daf4ddda-9f89-44fb-b3d5-a6f6d29d9a74}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Platform\Windows">
+      <UniqueIdentifier>{9ad2cc34-31c3-4dac-bed7-3e5a417cab24}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Core\Window">
+      <UniqueIdentifier>{7759ba0f-f6f2-43d8-bd9d-ac7884a1847e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Core\Application">
+      <UniqueIdentifier>{fa0f250d-b318-4b33-89a6-dee055789016}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="WinMain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Platform\Windows\Win32Window.cpp">
+      <Filter>Source Files\Platform\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Platform\Windows\WindowsPlatform.cpp">
+      <Filter>Source Files\Platform\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Core\Application\Timer.cpp">
+      <Filter>Source Files\Core\Application</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Core\Application\Application.cpp">
+      <Filter>Source Files\Core\Application</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Types.h">
+      <Filter>Source Files\Core\Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Core\Window\Window.h">
+      <Filter>Source Files\Core\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Platform\Windows\WindowsPlatform.h">
+      <Filter>Source Files\Platform\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Platform\Windows\Win32Window.h">
+      <Filter>Source Files\Platform\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Core\Application\Timer.h">
+      <Filter>Source Files\Core\Application</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Core\Application\Application.h">
+      <Filter>Source Files\Core\Application</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
