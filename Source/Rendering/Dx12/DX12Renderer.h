@@ -31,7 +31,7 @@ public:
     // Resource creation helpers for meshes and shaders
     bool CreateBuffer(uint64 size, D3D12_HEAP_TYPE heapType, D3D12_RESOURCE_STATES initialState,
                      ComPtr<ID3D12Resource>& buffer, const void* data = nullptr,
-                     ComPtr<ID3D12Resource>& uploadBuffer = nullptr);
+                     ComPtr<ID3D12Resource>* uploadBuffer = nullptr);
 
     bool CreateVertexBuffer(const void* data, uint64 size, ComPtr<ID3D12Resource>& vertexBuffer,
                            ComPtr<ID3D12Resource>& uploadBuffer, D3D12_VERTEX_BUFFER_VIEW& bufferView);

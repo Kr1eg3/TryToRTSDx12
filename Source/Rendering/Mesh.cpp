@@ -6,7 +6,7 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-#pragma comment(lib, "assimp-vc143-mt.lib")
+//#pragma comment(lib, "assimp-vc143-mt.lib")
 
 Mesh::Mesh() {
     Platform::OutputDebugMessage("Mesh created\n");

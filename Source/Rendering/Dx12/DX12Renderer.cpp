@@ -8,6 +8,7 @@
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "dxguid.lib")
+#pragma comment(lib, "d3dcompiler.lib")
 
 DX12Renderer::DX12Renderer() {
     Platform::OutputDebugMessage("DX12Renderer created\n");
@@ -634,7 +635,7 @@ void DX12Renderer::SetupDebugDevice() {
 
 bool DX12Renderer::CreateBuffer(uint64 size, D3D12_HEAP_TYPE heapType, D3D12_RESOURCE_STATES initialState,
                                 ComPtr<ID3D12Resource>& buffer, const void* data,
-                                ComPtr<ID3D12Resource>& uploadBuffer) {
+                                ComPtr<ID3D12Resource>* uploadBuffer) {
     try {
         D3D12_HEAP_PROPERTIES heapProps = {};
         heapProps.Type = heapType;
@@ -660,7 +661,7 @@ bool DX12Renderer::CreateBuffer(uint64 size, D3D12_HEAP_TYPE heapType, D3D12_RES
             IID_PPV_ARGS(&buffer)), "Create buffer");
 
         // If data is provided and we need an upload buffer
-        if (data && heapType == D3D12_HEAP_TYPE_DEFAULT) {
+        if (data && heapType == D3D12_HEAP_TYPE_DEFAULT && uploadBuffer) {
             D3D12_HEAP_PROPERTIES uploadHeapProps = {};
             uploadHeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
 
@@ -670,17 +671,17 @@ bool DX12Renderer::CreateBuffer(uint64 size, D3D12_HEAP_TYPE heapType, D3D12_RES
                 &bufferDesc,
                 D3D12_RESOURCE_STATE_GENERIC_READ,
                 nullptr,
-                IID_PPV_ARGS(&uploadBuffer)), "Create upload buffer");
+                IID_PPV_ARGS(uploadBuffer->GetAddressOf())), "Create upload buffer");
 
             // Map and copy data
             void* mappedData;
             D3D12_RANGE readRange = { 0, 0 };
-            THROW_IF_FAILED(uploadBuffer->Map(0, &readRange, &mappedData), "Map upload buffer");
+            THROW_IF_FAILED((*uploadBuffer)->Map(0, &readRange, &mappedData), "Map upload buffer");
             memcpy(mappedData, data, size);
-            uploadBuffer->Unmap(0, nullptr);
+			uploadBuffer->Get()->Unmap(0, nullptr);
 
             // Copy from upload buffer to default buffer
-            m_commandList->CopyBufferRegion(buffer.Get(), 0, uploadBuffer.Get(), 0, size);
+            m_commandList->CopyBufferRegion(buffer.Get(), 0, uploadBuffer->Get(), 0, size);
 
             // Transition to appropriate state
             if (initialState != D3D12_RESOURCE_STATE_COPY_DEST) {
@@ -705,7 +706,7 @@ bool DX12Renderer::CreateBuffer(uint64 size, D3D12_HEAP_TYPE heapType, D3D12_RES
 bool DX12Renderer::CreateVertexBuffer(const void* data, uint64 size, ComPtr<ID3D12Resource>& vertexBuffer,
                                      ComPtr<ID3D12Resource>& uploadBuffer, D3D12_VERTEX_BUFFER_VIEW& bufferView) {
     if (!CreateBuffer(size, D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
-                     vertexBuffer, data, uploadBuffer)) {
+                     vertexBuffer, data, &uploadBuffer)) {
         return false;
     }
 
@@ -719,7 +720,7 @@ bool DX12Renderer::CreateVertexBuffer(const void* data, uint64 size, ComPtr<ID3D
 bool DX12Renderer::CreateIndexBuffer(const void* data, uint64 size, ComPtr<ID3D12Resource>& indexBuffer,
                                     ComPtr<ID3D12Resource>& uploadBuffer, D3D12_INDEX_BUFFER_VIEW& bufferView) {
     if (!CreateBuffer(size, D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_STATE_INDEX_BUFFER,
-                     indexBuffer, data, uploadBuffer)) {
+                     indexBuffer, data, &uploadBuffer)) {
         return false;
     }
 
@@ -735,7 +736,7 @@ bool DX12Renderer::CreateConstantBuffer(uint64 size, ComPtr<ID3D12Resource>& con
     uint64 alignedSize = (size + 255) & ~255;
 
     if (!CreateBuffer(alignedSize, D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_GENERIC_READ,
-                     constantBuffer)) {
+                     constantBuffer, nullptr, nullptr)) {
         return false;
     }
 
