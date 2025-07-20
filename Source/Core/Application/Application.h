@@ -2,12 +2,14 @@
 
 #include "../../Core/Utilities/Types.h"
 #include "../../Core/Window/Window.h"
+#include "../../Rendering/Renderer.h"
 #include "Timer.h"
 
 // Application configuration
 struct ApplicationConfig {
     String name = "RTS Game";
     WindowDesc windowDesc;
+	RendererConfig rendererConfig;
     bool enableDebugLayer = DEBUG_BUILD;
     bool enableValidation = DEBUG_BUILD;
 };
@@ -29,6 +31,7 @@ public:
 
     // Accessors
     Window* GetWindow() const { return m_window.get(); }
+	Renderer* GetRenderer() const { return m_renderer.get(); }
     const Timer& GetTimer() const { return m_timer; }
     const ApplicationConfig& GetConfig() const { return m_config; }
 
@@ -50,6 +53,7 @@ protected:
 private:
     // Internal methods
     bool CreateAppWindow();
+	bool CreateRenderer();
     void SetupEventCallbacks();
     void MainLoop();
     void Update();
@@ -71,6 +75,7 @@ private:
 
     // Core systems
     UniquePtr<Window> m_window;
+	UniquePtr<Renderer> m_renderer;
     Timer m_timer;
 
     // Static instance

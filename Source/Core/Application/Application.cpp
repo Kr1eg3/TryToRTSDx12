@@ -31,6 +31,12 @@ bool Application::Initialize() {
         return false;
     }
 
+    // Create renderer
+    if (!CreateRenderer()) {
+        Platform::OutputDebugMessage("Failed to create renderer\n");
+        return false;
+    }
+
     // Setup event callbacks
     SetupEventCallbacks();
 
@@ -77,6 +83,12 @@ void Application::Shutdown() {
     // Call derived class shutdown
     OnShutdown();
 
+    // Cleanup renderer before window
+    if (m_renderer) {
+        m_renderer->Shutdown();
+        m_renderer.reset();
+    }
+
     // Cleanup window
     if (m_window) {
         m_window->Destroy();
@@ -94,6 +106,21 @@ bool Application::CreateAppWindow() {
     }
 
     return m_window->Create(m_config.windowDesc);
+}
+
+bool Application::CreateRenderer() {
+    m_renderer = Renderer::Create();
+    if (!m_renderer) {
+        Platform::OutputDebugMessage("Failed to create renderer instance\n");
+        return false;
+    }
+
+    if (!m_renderer->Initialize(m_window.get(), m_config.rendererConfig)) {
+        Platform::OutputDebugMessage("Failed to initialize renderer\n");
+        return false;
+    }
+
+    return true;
 }
 
 void Application::SetupEventCallbacks() {
@@ -169,15 +196,33 @@ void Application::Update() {
 }
 
 void Application::Render() {
+    // Begin frame
+    m_renderer->BeginFrame();
+
+    // Clear screen
+    ClearValues clearValues;
+    clearValues.color = { 0.2f, 0.3f, 0.4f, 1.0f }; // Nice blue-gray
+    m_renderer->Clear(clearValues);
+
     // Call derived class render
     OnRender();
+
+    // End frame and present
+    m_renderer->EndFrame();
+    m_renderer->Present();
 }
 
 void Application::HandleWindowResize(const WindowResizeEvent& event) {
     Platform::OutputDebugMessage("Window resize: " +
         std::to_string(event.width) + "x" + std::to_string(event.height) + "\n");
 
+    // Resize renderer
+    if (m_renderer) {
+        m_renderer->Resize(event.width, event.height);
+    }
+
     OnWindowResize(event.width, event.height);
+
 }
 
 void Application::HandleWindowClose() {

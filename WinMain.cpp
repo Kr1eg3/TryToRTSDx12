@@ -14,6 +14,15 @@ public:
         config.windowDesc.resizable = true;
         config.windowDesc.vsync = true;
 
+        // Renderer settings
+        config.rendererConfig.enableDebugLayer = DEBUG_BUILD;
+        config.rendererConfig.enableGpuValidation = DEBUG_BUILD;
+        config.rendererConfig.enableBreakOnError = DEBUG_BUILD;
+        config.rendererConfig.backBufferCount = 2;
+        config.rendererConfig.vsyncEnabled = true;
+        config.rendererConfig.maxFramesInFlight = 2;
+        config.rendererConfig.gpuMemoryBudgetMB = 512;
+
         // Set config (you'd need to modify Application constructor to accept this)
         // For now, this is just an example
     }
@@ -98,9 +107,8 @@ protected:
     }
 };
 
-// Use the macro to create the entry point
-//IMPLEMENT_APPLICATION(RTSApplication)
 
+//IMPLEMENT_APPLICATION(RTSApplication)
 int CALLBACK WinMain(_In_ HINSTANCE hInstance,
     _In_opt_ HINSTANCE hPrevInstance,
     _In_ LPSTR lpCmdLine, _In_ int nCmdShow) {
