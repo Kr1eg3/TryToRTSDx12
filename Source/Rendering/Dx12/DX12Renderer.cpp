@@ -2,6 +2,8 @@
 #include "../../Core/Window/Window.h"
 #include "../../Platform/Windows/WindowsPlatform.h"
 
+#include "../Mesh.h"
+
 // Link required libraries
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -628,6 +630,203 @@ void DX12Renderer::SetupDebugDevice() {
             infoQueue->PushStorageFilter(&filter);
         }
     }
+}
+
+bool DX12Renderer::CreateBuffer(uint64 size, D3D12_HEAP_TYPE heapType, D3D12_RESOURCE_STATES initialState,
+                                ComPtr<ID3D12Resource>& buffer, const void* data,
+                                ComPtr<ID3D12Resource>& uploadBuffer) {
+    try {
+        D3D12_HEAP_PROPERTIES heapProps = {};
+        heapProps.Type = heapType;
+        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+
+        D3D12_RESOURCE_DESC bufferDesc = {};
+        bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        bufferDesc.Width = size;
+        bufferDesc.Height = 1;
+        bufferDesc.DepthOrArraySize = 1;
+        bufferDesc.MipLevels = 1;
+        bufferDesc.Format = DXGI_FORMAT_UNKNOWN;
+        bufferDesc.SampleDesc.Count = 1;
+        bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+        THROW_IF_FAILED(m_device->CreateCommittedResource(
+            &heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &bufferDesc,
+            initialState,
+            nullptr,
+            IID_PPV_ARGS(&buffer)), "Create buffer");
+
+        // If data is provided and we need an upload buffer
+        if (data && heapType == D3D12_HEAP_TYPE_DEFAULT) {
+            D3D12_HEAP_PROPERTIES uploadHeapProps = {};
+            uploadHeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+            THROW_IF_FAILED(m_device->CreateCommittedResource(
+                &uploadHeapProps,
+                D3D12_HEAP_FLAG_NONE,
+                &bufferDesc,
+                D3D12_RESOURCE_STATE_GENERIC_READ,
+                nullptr,
+                IID_PPV_ARGS(&uploadBuffer)), "Create upload buffer");
+
+            // Map and copy data
+            void* mappedData;
+            D3D12_RANGE readRange = { 0, 0 };
+            THROW_IF_FAILED(uploadBuffer->Map(0, &readRange, &mappedData), "Map upload buffer");
+            memcpy(mappedData, data, size);
+            uploadBuffer->Unmap(0, nullptr);
+
+            // Copy from upload buffer to default buffer
+            m_commandList->CopyBufferRegion(buffer.Get(), 0, uploadBuffer.Get(), 0, size);
+
+            // Transition to appropriate state
+            if (initialState != D3D12_RESOURCE_STATE_COPY_DEST) {
+                D3D12_RESOURCE_BARRIER barrier = {};
+                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                barrier.Transition.pResource = buffer.Get();
+                barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+                barrier.Transition.StateAfter = initialState;
+                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+                m_commandList->ResourceBarrier(1, &barrier);
+            }
+        }
+
+        return true;
+    }
+    catch (const WindowsException& e) {
+        Platform::OutputDebugMessage("Error creating buffer: " + e.GetMessage());
+        return false;
+    }
+}
+
+bool DX12Renderer::CreateVertexBuffer(const void* data, uint64 size, ComPtr<ID3D12Resource>& vertexBuffer,
+                                     ComPtr<ID3D12Resource>& uploadBuffer, D3D12_VERTEX_BUFFER_VIEW& bufferView) {
+    if (!CreateBuffer(size, D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+                     vertexBuffer, data, uploadBuffer)) {
+        return false;
+    }
+
+    bufferView.BufferLocation = vertexBuffer->GetGPUVirtualAddress();
+    bufferView.StrideInBytes = sizeof(Vertex);
+    bufferView.SizeInBytes = static_cast<UINT>(size);
+
+    return true;
+}
+
+bool DX12Renderer::CreateIndexBuffer(const void* data, uint64 size, ComPtr<ID3D12Resource>& indexBuffer,
+                                    ComPtr<ID3D12Resource>& uploadBuffer, D3D12_INDEX_BUFFER_VIEW& bufferView) {
+    if (!CreateBuffer(size, D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_STATE_INDEX_BUFFER,
+                     indexBuffer, data, uploadBuffer)) {
+        return false;
+    }
+
+    bufferView.BufferLocation = indexBuffer->GetGPUVirtualAddress();
+    bufferView.Format = DXGI_FORMAT_R32_UINT;
+    bufferView.SizeInBytes = static_cast<UINT>(size);
+
+    return true;
+}
+
+bool DX12Renderer::CreateConstantBuffer(uint64 size, ComPtr<ID3D12Resource>& constantBuffer, void** mappedData) {
+    // Align size to 256 bytes (required for constant buffers)
+    uint64 alignedSize = (size + 255) & ~255;
+
+    if (!CreateBuffer(alignedSize, D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_GENERIC_READ,
+                     constantBuffer)) {
+        return false;
+    }
+
+    if (mappedData) {
+        D3D12_RANGE readRange = { 0, 0 };
+        THROW_IF_FAILED(constantBuffer->Map(0, &readRange, mappedData), "Map constant buffer");
+    }
+
+    return true;
+}
+
+bool DX12Renderer::CompileShader(const String& source, const String& entryPoint, const String& target,
+                                ComPtr<ID3DBlob>& shaderBlob) {
+    try {
+        ComPtr<ID3DBlob> errorBlob;
+
+        UINT compileFlags = 0;
+        #ifdef _DEBUG
+            compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+        #endif
+
+        HRESULT hr = D3DCompile(
+            source.c_str(),
+            source.length(),
+            nullptr,
+            nullptr,
+            nullptr,
+            entryPoint.c_str(),
+            target.c_str(),
+            compileFlags,
+            0,
+            &shaderBlob,
+            &errorBlob
+        );
+
+        if (FAILED(hr)) {
+            if (errorBlob) {
+                String errorMsg = "Shader compilation failed: ";
+                errorMsg += static_cast<const char*>(errorBlob->GetBufferPointer());
+                Platform::OutputDebugMessage(errorMsg);
+            }
+            return false;
+        }
+
+        return true;
+    }
+    catch (const std::exception& e) {
+        Platform::OutputDebugMessage("Error compiling shader: " + String(e.what()));
+        return false;
+    }
+}
+
+bool DX12Renderer::CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, uint32 numDescriptors,
+                                       D3D12_DESCRIPTOR_HEAP_FLAGS flags, ComPtr<ID3D12DescriptorHeap>& heap) {
+    try {
+        D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+        heapDesc.Type = type;
+        heapDesc.NumDescriptors = numDescriptors;
+        heapDesc.Flags = flags;
+        heapDesc.NodeMask = 0;
+
+        THROW_IF_FAILED(m_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&heap)),
+                        "Create descriptor heap");
+
+        return true;
+    }
+    catch (const WindowsException& e) {
+        Platform::OutputDebugMessage("Error creating descriptor heap: " + e.GetMessage());
+        return false;
+    }
+}
+
+uint32 DX12Renderer::GetDescriptorSize(D3D12_DESCRIPTOR_HEAP_TYPE type) const {
+    return m_device->GetDescriptorHandleIncrementSize(type);
+}
+
+void DX12Renderer::ExecuteCommandListAndWait() {
+    // Close command list
+    THROW_IF_FAILED(m_commandList->Close(), "Close command list for execute and wait");
+
+    // Execute command list
+    ID3D12CommandList* commandLists[] = { m_commandList.Get() };
+    m_commandQueue->ExecuteCommandLists(1, commandLists);
+
+    // Wait for completion
+    WaitForGpu();
+
+    // Reset command list
+    THROW_IF_FAILED(m_commandAllocators[m_currentFrameIndex]->Reset(), "Reset command allocator after wait");
+    THROW_IF_FAILED(m_commandList->Reset(m_commandAllocators[m_currentFrameIndex].Get(), nullptr),
+                    "Reset command list after wait");
 }
 
 // Factory method implementation

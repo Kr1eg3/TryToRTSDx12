@@ -28,6 +28,34 @@ public:
     uint64 GetGpuMemoryUsage() const override;
     uint32 GetCurrentFrameIndex() const override { return m_currentFrameIndex; }
 
+    // Resource creation helpers for meshes and shaders
+    bool CreateBuffer(uint64 size, D3D12_HEAP_TYPE heapType, D3D12_RESOURCE_STATES initialState,
+                     ComPtr<ID3D12Resource>& buffer, const void* data = nullptr,
+                     ComPtr<ID3D12Resource>& uploadBuffer = nullptr);
+
+    bool CreateVertexBuffer(const void* data, uint64 size, ComPtr<ID3D12Resource>& vertexBuffer,
+                           ComPtr<ID3D12Resource>& uploadBuffer, D3D12_VERTEX_BUFFER_VIEW& bufferView);
+
+    bool CreateIndexBuffer(const void* data, uint64 size, ComPtr<ID3D12Resource>& indexBuffer,
+                          ComPtr<ID3D12Resource>& uploadBuffer, D3D12_INDEX_BUFFER_VIEW& bufferView);
+
+    bool CreateConstantBuffer(uint64 size, ComPtr<ID3D12Resource>& constantBuffer, void** mappedData = nullptr);
+
+    // Shader compilation
+    bool CompileShader(const String& source, const String& entryPoint, const String& target,
+                      ComPtr<ID3DBlob>& shaderBlob);
+
+    // Descriptor heap access
+    bool CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type, uint32 numDescriptors,
+                             D3D12_DESCRIPTOR_HEAP_FLAGS flags, ComPtr<ID3D12DescriptorHeap>& heap);
+
+    uint32 GetDescriptorSize(D3D12_DESCRIPTOR_HEAP_TYPE type) const;
+
+    // Device access for external classes
+    ID3D12Device* GetDevice() const { return m_device.Get(); }
+    ID3D12GraphicsCommandList* GetCommandList() const { return m_commandList.Get(); }
+    ID3D12CommandQueue* GetCommandQueue() const { return m_commandQueue.Get(); }
+
 private:
     // Core D3D12 objects
     bool CreateDevice();
@@ -51,6 +79,9 @@ private:
     // Debug helpers
     void EnableDebugLayer();
     void SetupDebugDevice();
+
+    // Helper for resource uploads
+    void ExecuteCommandListAndWait();
 
 private:
     // Window reference

@@ -92,6 +92,7 @@ struct Handle {
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 #define BIT(x) (1u << (x))
 
+
 // Forward declarations
 class Application;
 class Window;

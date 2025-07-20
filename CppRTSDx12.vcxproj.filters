@@ -60,6 +60,12 @@
     <ClCompile Include="Source\Rendering\Renderer.cpp">
       <Filter>Source Files\Rendering</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Rendering\Mesh.cpp">
+      <Filter>Source Files\Rendering</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Rendering\ShaderManager.cpp">
+      <Filter>Source Files\Rendering</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Types.h">
@@ -85,6 +91,12 @@
     </ClInclude>
     <ClInclude Include="Source\Rendering\Dx12\DX12Renderer.h">
       <Filter>Source Files\Rendering\Dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Rendering\Mesh.h">
+      <Filter>Source Files\Rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Rendering\ShaderManager.h">
+      <Filter>Source Files\Rendering</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

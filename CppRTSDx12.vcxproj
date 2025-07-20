@@ -136,7 +136,9 @@
     <ClCompile Include="Source\Platform\Windows\Win32Window.cpp" />
     <ClCompile Include="Source\Platform\Windows\WindowsPlatform.cpp" />
     <ClCompile Include="Source\Rendering\Dx12\DX12Renderer.cpp" />
+    <ClCompile Include="Source\Rendering\Mesh.cpp" />
     <ClCompile Include="Source\Rendering\Renderer.cpp" />
+    <ClCompile Include="Source\Rendering\ShaderManager.cpp" />
     <ClCompile Include="WinMain.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -146,7 +148,9 @@
     <ClInclude Include="Source\Platform\Windows\Win32Window.h" />
     <ClInclude Include="Source\Platform\Windows\WindowsPlatform.h" />
     <ClInclude Include="Source\Rendering\Dx12\DX12Renderer.h" />
+    <ClInclude Include="Source\Rendering\Mesh.h" />
     <ClInclude Include="Source\Rendering\Renderer.h" />
+    <ClInclude Include="Source\Rendering\ShaderManager.h" />
     <ClInclude Include="Types.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
