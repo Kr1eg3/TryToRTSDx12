@@ -10,6 +10,7 @@
 struct ApplicationConfig {
     String name = "RTS Game";
     WindowDesc windowDesc;
+    CameraDesc cameraDesc;
 	RendererConfig rendererConfig;
     bool enableDebugLayer = DEBUG_BUILD;
     bool enableValidation = DEBUG_BUILD;
@@ -40,7 +41,6 @@ public:
     // Static instance access
     static Application* GetInstance() { return s_instance; }
 
-	UniquePtr<Camera> m_camera; // TODO: Figure out how to handle camera properly
 protected:
     // Virtual methods for derived classes
     virtual bool OnInitialize() { return true; }
@@ -57,6 +57,7 @@ private:
     // Internal methods
     bool CreateAppWindow();
 	bool CreateRenderer();
+	bool CreateCamera();
     void SetupEventCallbacks();
     void MainLoop();
     void Update();
@@ -78,6 +79,7 @@ private:
 
     // Core systems
     UniquePtr<Window> m_window;
+	UniquePtr<Camera> m_camera; // TODO: Figure out how to handle camera properly
 	UniquePtr<Renderer> m_renderer;
     Timer m_timer;
 

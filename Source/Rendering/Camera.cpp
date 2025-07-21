@@ -44,33 +44,34 @@ void Camera::Update(float32 deltaTime) {
     // Keyboard movement
     float velocity = m_moveSpeed * deltaTime;
 
-    if (m_keys[static_cast<size_t>(KeyCode::W)]) {
+    // Check individual keys using their uint16 values
+    if (m_keys[static_cast<uint16>(KeyCode::W)]) {
         MoveForward(velocity);
         moved = true;
     }
-    if (m_keys[static_cast<size_t>(KeyCode::S)]) {
+    if (m_keys[static_cast<uint16>(KeyCode::S)]) {
         MoveForward(-velocity);
         moved = true;
     }
-    if (m_keys[static_cast<size_t>(KeyCode::D)]) {
+    if (m_keys[static_cast<uint16>(KeyCode::D)]) {
         MoveRight(velocity);
         moved = true;
     }
-    if (m_keys[static_cast<size_t>(KeyCode::A)]) {
+    if (m_keys[static_cast<uint16>(KeyCode::A)]) {
         MoveRight(-velocity);
         moved = true;
     }
-    if (m_keys[static_cast<size_t>(KeyCode::Space)]) {
+    if (m_keys[static_cast<uint16>(KeyCode::Space)]) {
         MoveUp(velocity);
         moved = true;
     }
-    if (m_keys[static_cast<size_t>(KeyCode::Ctrl)]) {
+    if (m_keys[static_cast<uint16>(KeyCode::Ctrl)]) {
         MoveUp(-velocity);
         moved = true;
     }
 
     // Speed adjustment
-    if (m_keys[static_cast<size_t>(KeyCode::Shift)]) {
+    if (m_keys[static_cast<uint16>(KeyCode::Shift)]) {
         m_moveSpeed = 20.0f; // Fast mode
     } else {
         m_moveSpeed = 10.0f; // Normal speed
@@ -82,11 +83,13 @@ void Camera::Update(float32 deltaTime) {
 }
 
 void Camera::OnKeyEvent(const KeyEvent& event) {
-    if (event.key != KeyCode::Unknown) {
-        m_keys[static_cast<size_t>(event.key)] = event.pressed;
+    // Store key state for continuous movement
+    uint16 keyValue = static_cast<uint16>(event.key);
+    if (keyValue < 256) {
+        m_keys[keyValue] = event.pressed;
     }
 
-    // Handle special keys
+    // Handle special keys on press
     if (event.pressed) {
         switch (event.key) {
             case KeyCode::R:
@@ -107,8 +110,9 @@ void Camera::OnKeyEvent(const KeyEvent& event) {
 }
 
 void Camera::OnMouseButtonEvent(const MouseButtonEvent& event) {
-    if (event.button < MouseButton::Middle) {
-        m_mouseButtons[static_cast<size_t>(event.button)] = event.pressed;
+    uint8 buttonIndex = static_cast<uint8>(event.button);
+    if (buttonIndex < 3) {
+        m_mouseButtons[buttonIndex] = event.pressed;
     }
 
     // Reset mouse tracking on button press
@@ -119,7 +123,7 @@ void Camera::OnMouseButtonEvent(const MouseButtonEvent& event) {
 
 void Camera::OnMouseMoveEvent(const MouseMoveEvent& event) {
     // Only rotate camera when right mouse button is held
-    if (!m_mouseButtons[static_cast<size_t>(MouseButton::Right)]) {
+    if (!m_mouseButtons[static_cast<uint8>(MouseButton::Right)]) {
         m_firstMouse = true;
         return;
     }

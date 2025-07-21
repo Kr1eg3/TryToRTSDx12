@@ -41,6 +41,14 @@ private:
         config.rendererConfig.maxFramesInFlight = 2;
         config.rendererConfig.gpuMemoryBudgetMB = 512;
 
+        // Camera settings
+        config.cameraDesc.position = { 0.0f, 5.0f, -10.0f };   // Above and behind origin
+        config.cameraDesc.target = { 0.0f, 0.0f, 0.0f };       // Look at origin
+        config.cameraDesc.fovY = DirectX::XM_PIDIV4;            // 45 degrees
+        config.cameraDesc.moveSpeed = 15.0f;                    // Fast movement for RTS
+        config.cameraDesc.mouseSensitivity = 0.002f;            // Comfortable sensitivity
+        config.cameraDesc.scrollSensitivity = 3.0f;             // Zoom sensitivity
+
         return config;
     }
 
@@ -69,34 +77,6 @@ protected:
             return false;
         }
 
-        // Setup camera
-        CameraDesc cameraDesc;
-        cameraDesc.position = { 0.0f, 5.0f, -10.0f };  // Positioned above and behind origin
-        cameraDesc.target = { 0.0f, 0.0f, 0.0f };       // Looking at origin
-        cameraDesc.fovY = DirectX::XM_PIDIV4;            // 45 degrees
-        cameraDesc.aspectRatio = static_cast<float>(GetWindow()->GetWidth()) /
-                                 static_cast<float>(GetWindow()->GetHeight());
-        cameraDesc.moveSpeed = 15.0f;                    // Faster movement for RTS
-        cameraDesc.mouseSensitivity = 0.002f;            // Comfortable mouse sensitivity
-
-        m_camera = std::make_unique<Camera>(cameraDesc);
-
-		m_cameraPosition = m_camera->GetPosition();
-        m_viewMatrix = DirectX::XMMatrixLookAtLH(
-            DirectX::XMLoadFloat3(&m_cameraPosition),
-            DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f),
-            DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)
-        );
-
-        // Setup projection matrix
-        float aspectRatio = static_cast<float>(GetWindow()->GetWidth()) / static_cast<float>(GetWindow()->GetHeight());
-        m_projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(
-            DirectX::XMConvertToRadians(45.0f),
-            aspectRatio,
-            0.1f,
-            100.0f
-        );
-
         Platform::OutputDebugMessage("RTS Application initialized successfully!\n");
         return true;
     }
@@ -107,13 +87,9 @@ protected:
         // Cleanup in reverse order
         m_cube.reset();
         m_shaderManager.reset();
-		m_camera.reset();
     }
 
     void OnUpdate(float32 deltaTime) override {
-		// Update camera
-		m_camera->Update(deltaTime);
-
         // Rotate the cube
         m_rotationY += deltaTime * 0.5f; // Half a radian per second
 
@@ -138,13 +114,18 @@ protected:
         }
 
         // Update shader constants
-        if (m_shaderManager) {
+        if (m_shaderManager && GetCamera()) {
             // Model matrix (rotation around Y axis)
             DirectX::XMMATRIX modelMatrix = DirectX::XMMatrixRotationY(m_rotationY);
             m_shaderManager->UpdateModelConstants(modelMatrix);
 
             // View and projection matrices
-            m_shaderManager->UpdateViewConstants(m_viewMatrix, m_projectionMatrix, m_cameraPosition);
+            // View and projection matrices from built-in camera
+            DirectX::XMMATRIX viewMatrix = GetCamera()->GetViewMatrix();
+            DirectX::XMMATRIX projMatrix = GetCamera()->GetProjectionMatrix();
+            DirectX::XMFLOAT3 cameraPosition = GetCamera()->GetPosition();
+
+            m_shaderManager->UpdateViewConstants(viewMatrix, projMatrix, cameraPosition);
 
             // Light constants
             DirectX::XMFLOAT3 lightDirection = { 0.0f, -1.0f, 1.0f };
@@ -177,11 +158,6 @@ protected:
     }
 
     void OnKeyEvent(const KeyEvent& event) override {
-        // Pass key events to camera
-        if (m_camera) {
-            m_camera->OnKeyEvent(event);
-        }
-
         if (event.key == KeyCode::Escape && event.pressed) {
             Platform::OutputDebugMessage("Escape pressed, requesting exit...\n");
             RequestExit();
@@ -193,11 +169,6 @@ protected:
     }
 
     void OnMouseButtonEvent(const MouseButtonEvent& event) override {
-        // Pass mouse events to camera
-        if (m_camera) {
-            m_camera->OnMouseButtonEvent(event);
-        }
-
         String buttonName = (event.button == MouseButton::Left) ? "Left" :
                            (event.button == MouseButton::Right) ? "Right" : "Middle";
         String action = event.pressed ? "pressed" : "released";

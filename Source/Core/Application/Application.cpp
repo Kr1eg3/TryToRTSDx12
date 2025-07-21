@@ -9,6 +9,12 @@ Application::Application(const ApplicationConfig& config)
 {
     ASSERT(s_instance == nullptr, "Application instance already exists!");
     s_instance = this;
+
+    // Setup default camera configuration if not provided
+    if (m_config.cameraDesc.aspectRatio == 0.0f) {
+        m_config.cameraDesc.aspectRatio = static_cast<float>(m_config.windowDesc.width) /
+                                         static_cast<float>(m_config.windowDesc.height);
+    }
 }
 
 Application::~Application() {
@@ -34,6 +40,12 @@ bool Application::Initialize() {
     // Create renderer
     if (!CreateRenderer()) {
         Platform::OutputDebugMessage("Failed to create renderer\n");
+        return false;
+    }
+
+    // Create camera
+    if (!CreateCamera()) {
+        Platform::OutputDebugMessage("Failed to create camera\n");
         return false;
     }
 
@@ -83,6 +95,11 @@ void Application::Shutdown() {
     // Call derived class shutdown
     OnShutdown();
 
+    // Cleanup camera
+    if (m_camera) {
+        m_camera.reset();
+    }
+
     // Cleanup renderer before window
     if (m_renderer) {
         m_renderer->Shutdown();
@@ -120,6 +137,23 @@ bool Application::CreateRenderer() {
         return false;
     }
 
+    return true;
+}
+
+bool Application::CreateCamera() {
+    Platform::OutputDebugMessage("Creating camera...\n");
+
+    // Update aspect ratio based on actual window size
+    m_config.cameraDesc.aspectRatio = static_cast<float>(m_window->GetWidth()) /
+                                     static_cast<float>(m_window->GetHeight());
+
+    m_camera = std::make_unique<Camera>(m_config.cameraDesc);
+    if (!m_camera) {
+        Platform::OutputDebugMessage("Failed to create camera instance\n");
+        return false;
+    }
+
+    Platform::OutputDebugMessage("Camera created successfully\n");
     return true;
 }
 
@@ -191,6 +225,11 @@ void Application::MainLoop() {
 void Application::Update() {
     float32 deltaTime = m_timer.GetDeltaTime();
 
+    // Update camera first
+    if (m_camera) {
+        m_camera->Update(deltaTime);
+    }
+
     // Call derived class update
     OnUpdate(deltaTime);
 }
@@ -221,6 +260,12 @@ void Application::HandleWindowResize(const WindowResizeEvent& event) {
         m_renderer->Resize(event.width, event.height);
     }
 
+    // Update camera aspect ratio
+    if (m_camera && event.height > 0) {
+        float aspectRatio = static_cast<float>(event.width) / static_cast<float>(event.height);
+        m_camera->SetAspectRatio(aspectRatio);
+    }
+
     OnWindowResize(event.width, event.height);
 
 }
@@ -231,17 +276,37 @@ void Application::HandleWindowClose() {
 }
 
 void Application::HandleKeyEvent(const KeyEvent& event) {
+    // Pass to camera first
+    if (m_camera) {
+        m_camera->OnKeyEvent(event);
+    }
+
     OnKeyEvent(event);
 }
 
 void Application::HandleMouseButtonEvent(const MouseButtonEvent& event) {
+    // Pass to camera first
+    if (m_camera) {
+        m_camera->OnMouseButtonEvent(event);
+    }
+
     OnMouseButtonEvent(event);
 }
 
 void Application::HandleMouseMoveEvent(const MouseMoveEvent& event) {
+    // Pass to camera first
+    if (m_camera) {
+        m_camera->OnMouseMoveEvent(event);
+    }
+
     OnMouseMoveEvent(event);
 }
 
 void Application::HandleMouseWheelEvent(const MouseWheelEvent& event) {
+    // Pass to camera first
+    if (m_camera) {
+        m_camera->OnMouseWheelEvent(event);
+    }
+
     OnMouseWheelEvent(event);
 }

@@ -294,8 +294,8 @@ bool ShaderManager::CreateBasicMeshPSO() {
         psoDesc.PS = { m_pixelShader->GetBufferPointer(), m_pixelShader->GetBufferSize() };
 
         // Rasterizer state
-        psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
-        psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+        psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME; // D3D12_FILL_MODE_SOLID
+        psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE; // D3D12_CULL_MODE_BACK
         psoDesc.RasterizerState.FrontCounterClockwise = FALSE;
         psoDesc.RasterizerState.DepthBias = 0;
         psoDesc.RasterizerState.DepthBiasClamp = 0.0f;

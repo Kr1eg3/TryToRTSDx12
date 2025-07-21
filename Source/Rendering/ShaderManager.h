@@ -43,7 +43,7 @@ public:
     void Shutdown();
 
     // Shader compilation and loading
-    bool CompileShaderFromFile(const String& filePath, const String& entryPoint, 
+    bool CompileShaderFromFile(const String& filePath, const String& entryPoint,
                               const String& target, ComPtr<ID3DBlob>& shaderBlob);
     bool LoadCompiledShader(const String& filePath, ComPtr<ID3DBlob>& shaderBlob);
 
@@ -58,11 +58,11 @@ public:
 
     // Update constant buffers
     void UpdateModelConstants(const DirectX::XMMATRIX& modelMatrix);
-    void UpdateViewConstants(const DirectX::XMMATRIX& viewMatrix, 
+    void UpdateViewConstants(const DirectX::XMMATRIX& viewMatrix,
                            const DirectX::XMMATRIX& projMatrix,
                            const DirectX::XMFLOAT3& cameraPos);
-    void UpdateLightConstants(const DirectX::XMFLOAT3& lightDir, 
-                            const DirectX::XMFLOAT3& lightColor, 
+    void UpdateLightConstants(const DirectX::XMFLOAT3& lightDir,
+                            const DirectX::XMFLOAT3& lightColor,
                             float intensity);
 
     // Accessors
@@ -77,7 +77,7 @@ private:
 
 private:
     DX12Renderer* m_renderer = nullptr;
-    
+
     // Shaders
     ComPtr<ID3DBlob> m_vertexShader;
     ComPtr<ID3DBlob> m_pixelShader;
