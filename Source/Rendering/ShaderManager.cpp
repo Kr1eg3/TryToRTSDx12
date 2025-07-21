@@ -82,7 +82,6 @@ bool ShaderManager::CreateBasicMeshShaders() {
     // Create default shader code
     CreateDefaultShaderCode();
 
-    // Исправленный вершинный шейдер с правильным порядком матриц
     String vertexShaderCode = R"(
 cbuffer ModelConstants : register(b0)
 {
@@ -119,13 +118,12 @@ VertexOutput VSMain(VertexInput input)
 {
     VertexOutput output;
 
-    // Исправленный порядок матриц для DirectX
-    float4 worldPosition = mul(ModelMatrix, float4(input.Position, 1.0f));
+    float4 worldPosition = mul(float4(input.Position, 1.0f), ModelMatrix);
     output.WorldPosition = worldPosition.xyz;
-    output.Position = mul(ViewProjectionMatrix, worldPosition);
+    output.Position = mul(worldPosition, ViewProjectionMatrix);
 
-    // Исправленный порядок для нормалей
-    output.Normal = normalize(mul((float3x3)NormalMatrix, input.Normal));
+    // Transform normal using the normal matrix (which should be inverse transpose of model matrix)
+    output.Normal = normalize(mul(float4(input.Normal, 0.0f), NormalMatrix).xyz);
     output.TexCoord = input.TexCoord;
     output.ViewDirection = normalize(CameraPosition - worldPosition.xyz);
 
@@ -314,9 +312,8 @@ bool ShaderManager::CreateBasicMeshPSO() {
         psoDesc.VS = { m_vertexShader->GetBufferPointer(), m_vertexShader->GetBufferSize() };
         psoDesc.PS = { m_pixelShader->GetBufferPointer(), m_pixelShader->GetBufferSize() };
 
-        // Rasterizer state - изменено на solid fill для лучшей визуализации
         psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID; // Было WIREFRAME
-        psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;  // Включен back-face culling
+        psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;  // Включен back-face culling
         psoDesc.RasterizerState.FrontCounterClockwise = FALSE;
         psoDesc.RasterizerState.DepthBias = 0;
         psoDesc.RasterizerState.DepthBiasClamp = 0.0f;
@@ -386,11 +383,9 @@ void ShaderManager::BindForMeshRendering(ID3D12GraphicsCommandList* commandList,
         return;
     }
 
-    // Set pipeline state and root signature
     commandList->SetPipelineState(m_basicMeshPSO.Get());
     commandList->SetGraphicsRootSignature(m_basicMeshRootSignature.Get());
 
-    // Bind constant buffers - используем специфичный для объекта model buffer
     commandList->SetGraphicsRootConstantBufferView(0,
         m_modelConstantBuffers[objectIndex]->GetGPUVirtualAddress());
     commandList->SetGraphicsRootConstantBufferView(1,
@@ -400,7 +395,6 @@ void ShaderManager::BindForMeshRendering(ID3D12GraphicsCommandList* commandList,
 }
 
 void ShaderManager::UpdateModelConstants(const DirectX::XMMATRIX& modelMatrix) {
-    // Старая версия метода - обновляем первый объект по умолчанию
     UpdateModelConstants(modelMatrix, 0);
 }
 
@@ -411,7 +405,6 @@ void ShaderManager::UpdateModelConstants(const DirectX::XMMATRIX& modelMatrix, u
         return;
     }
 
-    // Транспонируем матрицы для HLSL
     m_mappedModelConstants[objectIndex]->modelMatrix = DirectX::XMMatrixTranspose(modelMatrix);
     m_mappedModelConstants[objectIndex]->normalMatrix = DirectX::XMMatrixTranspose(
         DirectX::XMMatrixInverse(nullptr, modelMatrix));

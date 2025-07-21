@@ -94,7 +94,7 @@ void Camera::OnKeyEvent(const KeyEvent& event) {
         switch (event.key) {
             case KeyCode::R:
                 // Reset camera to default position
-                SetPosition({ 0.0f, 0.0f, -5.0f });
+                SetPosition({ 0.0f, 5.0f, -10.0f });
                 SetTarget({ 0.0f, 0.0f, 0.0f });
                 Platform::OutputDebugMessage("Camera reset\n");
                 break;
@@ -292,11 +292,13 @@ void Camera::UpdateMatrices() const {
 
         XMVECTOR targetVec = XMVectorAdd(posVec, forwardVec);
 
+        // Use RH for consistency with projection matrix
         m_viewMatrix = XMMatrixLookAtRH(posVec, targetVec, upVec);
         m_viewMatrixDirty = false;
     }
 
     if (m_projectionMatrixDirty) {
+        // Use RH for DirectX 12 default
         m_projectionMatrix = XMMatrixPerspectiveFovRH(m_fovY, m_aspectRatio, m_nearPlane, m_farPlane);
         m_projectionMatrixDirty = false;
     }
