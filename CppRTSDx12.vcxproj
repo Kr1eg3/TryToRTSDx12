@@ -135,6 +135,7 @@
     <ClCompile Include="Source\Core\Application\Timer.cpp" />
     <ClCompile Include="Source\Platform\Windows\Win32Window.cpp" />
     <ClCompile Include="Source\Platform\Windows\WindowsPlatform.cpp" />
+    <ClCompile Include="Source\Rendering\Camera.cpp" />
     <ClCompile Include="Source\Rendering\Dx12\DX12Renderer.cpp" />
     <ClCompile Include="Source\Rendering\Mesh.cpp" />
     <ClCompile Include="Source\Rendering\Renderer.cpp" />
@@ -147,6 +148,7 @@
     <ClInclude Include="Source\Core\Window\Window.h" />
     <ClInclude Include="Source\Platform\Windows\Win32Window.h" />
     <ClInclude Include="Source\Platform\Windows\WindowsPlatform.h" />
+    <ClInclude Include="Source\Rendering\Camera.h" />
     <ClInclude Include="Source\Rendering\Dx12\DX12Renderer.h" />
     <ClInclude Include="Source\Rendering\Mesh.h" />
     <ClInclude Include="Source\Rendering\Renderer.h" />

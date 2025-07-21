@@ -70,7 +70,18 @@ protected:
         }
 
         // Setup camera
-        m_cameraPosition = { 0.0f, 0.0f, -5.0f };
+        CameraDesc cameraDesc;
+        cameraDesc.position = { 0.0f, 5.0f, -10.0f };  // Positioned above and behind origin
+        cameraDesc.target = { 0.0f, 0.0f, 0.0f };       // Looking at origin
+        cameraDesc.fovY = DirectX::XM_PIDIV4;            // 45 degrees
+        cameraDesc.aspectRatio = static_cast<float>(GetWindow()->GetWidth()) /
+                                 static_cast<float>(GetWindow()->GetHeight());
+        cameraDesc.moveSpeed = 15.0f;                    // Faster movement for RTS
+        cameraDesc.mouseSensitivity = 0.002f;            // Comfortable mouse sensitivity
+
+        m_camera = std::make_unique<Camera>(cameraDesc);
+
+		m_cameraPosition = m_camera->GetPosition();
         m_viewMatrix = DirectX::XMMatrixLookAtLH(
             DirectX::XMLoadFloat3(&m_cameraPosition),
             DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f),
@@ -96,9 +107,13 @@ protected:
         // Cleanup in reverse order
         m_cube.reset();
         m_shaderManager.reset();
+		m_camera.reset();
     }
 
     void OnUpdate(float32 deltaTime) override {
+		// Update camera
+		m_camera->Update(deltaTime);
+
         // Rotate the cube
         m_rotationY += deltaTime * 0.5f; // Half a radian per second
 
@@ -162,6 +177,11 @@ protected:
     }
 
     void OnKeyEvent(const KeyEvent& event) override {
+        // Pass key events to camera
+        if (m_camera) {
+            m_camera->OnKeyEvent(event);
+        }
+
         if (event.key == KeyCode::Escape && event.pressed) {
             Platform::OutputDebugMessage("Escape pressed, requesting exit...\n");
             RequestExit();
@@ -173,6 +193,11 @@ protected:
     }
 
     void OnMouseButtonEvent(const MouseButtonEvent& event) override {
+        // Pass mouse events to camera
+        if (m_camera) {
+            m_camera->OnMouseButtonEvent(event);
+        }
+
         String buttonName = (event.button == MouseButton::Left) ? "Left" :
                            (event.button == MouseButton::Right) ? "Right" : "Middle";
         String action = event.pressed ? "pressed" : "released";

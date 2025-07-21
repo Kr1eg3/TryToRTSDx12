@@ -3,6 +3,7 @@
 #include "../../Core/Utilities/Types.h"
 #include "../../Core/Window/Window.h"
 #include "../../Rendering/Renderer.h"
+#include "../../Rendering/Camera.h"
 #include "Timer.h"
 
 // Application configuration
@@ -32,12 +33,14 @@ public:
     // Accessors
     Window* GetWindow() const { return m_window.get(); }
 	Renderer* GetRenderer() const { return m_renderer.get(); }
+	Camera* GetCamera() const { return m_camera.get(); }
     const Timer& GetTimer() const { return m_timer; }
     const ApplicationConfig& GetConfig() const { return m_config; }
 
     // Static instance access
     static Application* GetInstance() { return s_instance; }
 
+	UniquePtr<Camera> m_camera; // TODO: Figure out how to handle camera properly
 protected:
     // Virtual methods for derived classes
     virtual bool OnInitialize() { return true; }
