@@ -17,7 +17,6 @@ Entity::~Entity() {
 void Entity::Update(float deltaTime) {
     if (!m_isActive) return;
 
-    // Update all components
     for (auto& [type, component] : m_components) {
         if (component && component->IsActive()) {
             component->Update(deltaTime);

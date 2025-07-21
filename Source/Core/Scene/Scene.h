@@ -8,7 +8,8 @@
 #include <unordered_map>
 
 // Forward declarations
-class DX12Renderer;
+class Renderer;    // Используем базовый класс вместо DX12Renderer
+class DX12Renderer; // Для совместимости с существующим кодом
 class ShaderManager;
 
 class Scene {
@@ -29,14 +30,17 @@ public:
     const Vector<UniquePtr<Entity>>& GetEntities() const { return m_entities; }
     size_t GetEntityCount() const { return m_entities.size(); }
 
-    // Level lifecycle
+    // Scene lifecycle
     virtual void Initialize();
     virtual void BeginPlay();
     virtual void EndPlay();
     virtual void Update(float deltaTime);
-    virtual void Render(DX12Renderer* renderer);
+    
+    // Перегрузки для совместимости
+    virtual void Render(Renderer* renderer);
+    virtual void Render(DX12Renderer* renderer); // Обратная совместимость
 
-    // Level properties
+    // Scene properties
     const String& GetName() const { return m_name; }
     void SetName(const String& name) { m_name = name; }
 
@@ -78,7 +82,7 @@ T* Scene::SpawnEntity(Args&&... args) {
     auto entity = std::make_unique<T>(id, std::forward<Args>(args)...);
     T* entityPtr = entity.get();
 
-    // Set level reference
+    // Set scene reference
     entityPtr->SetScene(this);
 
     // Add transform component by default
