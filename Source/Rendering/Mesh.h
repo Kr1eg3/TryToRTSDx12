@@ -32,6 +32,12 @@ public:
     // Rendering
     void Draw(ID3D12GraphicsCommandList* commandList);
 
+    // Upload data when command list is recording
+    bool UploadData(class DX12Renderer* renderer);
+
+    // Check if upload is needed
+    bool NeedsUpload() const { return m_needsUpload; }
+
     // Accessors
     uint32 GetVertexCount() const { return m_vertexCount; }
     uint32 GetIndexCount() const { return m_indexCount; }
@@ -53,6 +59,11 @@ private:
 
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView{};
     D3D12_INDEX_BUFFER_VIEW m_indexBufferView{};
+
+    // Upload tracking
+    bool m_needsUpload = false;
+    uint64 m_vertexBufferSize = 0;
+    uint64 m_indexBufferSize = 0;
 
     // Helper methods
     bool CreateBuffers(class DX12Renderer* renderer);

@@ -33,6 +33,10 @@ public:
                      ComPtr<ID3D12Resource>& buffer, const void* data = nullptr,
                      ComPtr<ID3D12Resource>* uploadBuffer = nullptr);
 
+    bool CopyUploadToDefaultBuffer(ComPtr<ID3D12Resource>& defaultBuffer, 
+                                  ComPtr<ID3D12Resource>& uploadBuffer, 
+                                  uint64 size, D3D12_RESOURCE_STATES finalState);
+
     bool CreateVertexBuffer(const void* data, uint64 size, ComPtr<ID3D12Resource>& vertexBuffer,
                            ComPtr<ID3D12Resource>& uploadBuffer, D3D12_VERTEX_BUFFER_VIEW& bufferView);
 

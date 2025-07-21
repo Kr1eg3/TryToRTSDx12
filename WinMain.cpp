@@ -1,11 +1,29 @@
 #include "Source/Core/Application/Application.h"
 #include "Source/Platform/Windows/WindowsPlatform.h"
+#include "Source/Rendering/Mesh.h"
+#include "Source/Rendering/ShaderManager.h"
+#include "Source/Rendering/Dx12/DX12Renderer.h"
+#include <DirectXMath.h>
 
 // Simple RTS application class
 class RTSApplication : public Application {
+private:
+    // Game objects
+    UniquePtr<Mesh> m_cube;
+    UniquePtr<ShaderManager> m_shaderManager;
+
+    // Camera and view matrices
+    DirectX::XMMATRIX m_viewMatrix;
+    DirectX::XMMATRIX m_projectionMatrix;
+    DirectX::XMFLOAT3 m_cameraPosition;
+    float m_rotationY = 0.0f;
+
 public:
-    RTSApplication() : Application() {
-        // Configure application
+    RTSApplication() : Application(CreateConfig()) {
+    }
+
+private:
+    static ApplicationConfig CreateConfig() {
         ApplicationConfig config;
         config.name = "RTS Game - DirectX 12";
         config.windowDesc.title = "RTS Game - DirectX 12";
@@ -23,20 +41,50 @@ public:
         config.rendererConfig.maxFramesInFlight = 2;
         config.rendererConfig.gpuMemoryBudgetMB = 512;
 
-        // Set config (you'd need to modify Application constructor to accept this)
-        // For now, this is just an example
+        return config;
     }
 
 protected:
     bool OnInitialize() override {
         Platform::OutputDebugMessage("RTS Application initializing...\n");
 
-        // Initialize game systems here
-        // - Renderer
-        // - ECS
-        // - Resource Manager
-        // - Input System
-        // etc.
+        // Get DX12 renderer
+        DX12Renderer* dx12Renderer = static_cast<DX12Renderer*>(GetRenderer());
+        if (!dx12Renderer) {
+            Platform::OutputDebugMessage("Failed to get DX12 renderer\n");
+            return false;
+        }
+
+        // Initialize shader manager
+        m_shaderManager = std::make_unique<ShaderManager>();
+        if (!m_shaderManager->Initialize(dx12Renderer)) {
+            Platform::OutputDebugMessage("Failed to initialize shader manager\n");
+            return false;
+        }
+
+        // Create cube mesh
+        m_cube = std::make_unique<Mesh>();
+        if (!m_cube->CreateCube(dx12Renderer)) {
+            Platform::OutputDebugMessage("Failed to create cube mesh\n");
+            return false;
+        }
+
+        // Setup camera
+        m_cameraPosition = { 0.0f, 0.0f, -5.0f };
+        m_viewMatrix = DirectX::XMMatrixLookAtLH(
+            DirectX::XMLoadFloat3(&m_cameraPosition),
+            DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f),
+            DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f)
+        );
+
+        // Setup projection matrix
+        float aspectRatio = static_cast<float>(GetWindow()->GetWidth()) / static_cast<float>(GetWindow()->GetHeight());
+        m_projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(
+            DirectX::XMConvertToRadians(45.0f),
+            aspectRatio,
+            0.1f,
+            100.0f
+        );
 
         Platform::OutputDebugMessage("RTS Application initialized successfully!\n");
         return true;
@@ -45,11 +93,14 @@ protected:
     void OnShutdown() override {
         Platform::OutputDebugMessage("RTS Application shutting down...\n");
 
-        // Cleanup game systems here
+        // Cleanup in reverse order
+        m_cube.reset();
+        m_shaderManager.reset();
     }
 
     void OnUpdate(float32 deltaTime) override {
-        // Update game logic here
+        // Rotate the cube
+        m_rotationY += deltaTime * 0.5f; // Half a radian per second
 
         // Example: Print FPS every second
         static float32 fpsTimer = 0.0f;
@@ -62,13 +113,52 @@ protected:
     }
 
     void OnRender() override {
-        // Render game here
-        // For now, just clear to a color
+        // Get DX12 renderer
+        DX12Renderer* dx12Renderer = static_cast<DX12Renderer*>(GetRenderer());
+        if (!dx12Renderer) return;
+
+        // Upload mesh data if needed (this should be done when command list is recording)
+        if (m_cube && m_cube->NeedsUpload()) {
+            m_cube->UploadData(dx12Renderer);
+        }
+
+        // Update shader constants
+        if (m_shaderManager) {
+            // Model matrix (rotation around Y axis)
+            DirectX::XMMATRIX modelMatrix = DirectX::XMMatrixRotationY(m_rotationY);
+            m_shaderManager->UpdateModelConstants(modelMatrix);
+
+            // View and projection matrices
+            m_shaderManager->UpdateViewConstants(m_viewMatrix, m_projectionMatrix, m_cameraPosition);
+
+            // Light constants
+            DirectX::XMFLOAT3 lightDirection = { 0.0f, -1.0f, 1.0f };
+            DirectX::XMFLOAT3 lightColor = { 1.0f, 1.0f, 1.0f };
+            float lightIntensity = 1.0f;
+            m_shaderManager->UpdateLightConstants(lightDirection, lightColor, lightIntensity);
+
+            // Bind shaders and resources
+            m_shaderManager->BindForMeshRendering(dx12Renderer->GetCommandList());
+        }
+
+        // Draw cube
+        if (m_cube) {
+            m_cube->Draw(dx12Renderer->GetCommandList());
+        }
     }
 
     void OnWindowResize(uint32 width, uint32 height) override {
         Platform::OutputDebugMessage("Window resized to " +
             std::to_string(width) + "x" + std::to_string(height) + "\n");
+
+        // Update projection matrix for new aspect ratio
+        float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
+        m_projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(
+            DirectX::XMConvertToRadians(45.0f),
+            aspectRatio,
+            0.1f,
+            100.0f
+        );
     }
 
     void OnKeyEvent(const KeyEvent& event) override {
@@ -106,7 +196,6 @@ protected:
             " at (" + std::to_string(event.x) + ", " + std::to_string(event.y) + ")\n");
     }
 };
-
 
 //IMPLEMENT_APPLICATION(RTSApplication)
 int CALLBACK WinMain(_In_ HINSTANCE hInstance,

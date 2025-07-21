@@ -188,18 +188,75 @@ bool Mesh::CreateBuffers(DX12Renderer* renderer) {
     try {
         Platform::OutputDebugMessage("Creating mesh buffers...\n");
 
-        // We need access to the device from the renderer
-        // For now, we'll create the buffers in a simple way
-        // In a real implementation, you'd want to expose more functionality from DX12Renderer
+        uint64 vertexBufferSize = m_vertices.size() * sizeof(Vertex);
+        uint64 indexBufferSize = m_indices.size() * sizeof(uint32);
 
-        // This is a simplified version - in practice you'd want to implement buffer creation
-        // methods in the DX12Renderer class and call them from here
+        // Create vertex buffer (this will create both default and upload buffers)
+        if (!renderer->CreateBuffer(vertexBufferSize, D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+                                   m_vertexBuffer, m_vertices.data(), &m_vertexBufferUpload)) {
+            Platform::OutputDebugMessage("Failed to create vertex buffer\n");
+            return false;
+        }
+
+        // Setup vertex buffer view
+        m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+        m_vertexBufferView.StrideInBytes = sizeof(Vertex);
+        m_vertexBufferView.SizeInBytes = static_cast<UINT>(vertexBufferSize);
+
+        // Create index buffer (this will create both default and upload buffers)
+        if (!renderer->CreateBuffer(indexBufferSize, D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_STATE_INDEX_BUFFER,
+                                   m_indexBuffer, m_indices.data(), &m_indexBufferUpload)) {
+            Platform::OutputDebugMessage("Failed to create index buffer\n");
+            return false;
+        }
+
+        // Setup index buffer view
+        m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+        m_indexBufferView.Format = DXGI_FORMAT_R32_UINT;
+        m_indexBufferView.SizeInBytes = static_cast<UINT>(indexBufferSize);
+
+        // Mark that we need to copy data (this will be done when command list is recording)
+        m_needsUpload = true;
+        m_vertexBufferSize = vertexBufferSize;
+        m_indexBufferSize = indexBufferSize;
 
         Platform::OutputDebugMessage("Mesh buffers created successfully\n");
         return true;
     }
     catch (const WindowsException& e) {
         Platform::OutputDebugMessage("Error creating mesh buffers: " + e.GetMessage());
+        return false;
+    }
+}
+
+bool Mesh::UploadData(DX12Renderer* renderer) {
+    if (!m_needsUpload || !renderer) {
+        return true; // Nothing to upload or invalid renderer
+    }
+
+    try {
+        // Copy vertex buffer
+        if (m_vertexBuffer && m_vertexBufferUpload) {
+            if (!renderer->CopyUploadToDefaultBuffer(m_vertexBuffer, m_vertexBufferUpload,
+                                                    m_vertexBufferSize, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER)) {
+                return false;
+            }
+        }
+
+        // Copy index buffer
+        if (m_indexBuffer && m_indexBufferUpload) {
+            if (!renderer->CopyUploadToDefaultBuffer(m_indexBuffer, m_indexBufferUpload,
+                                                    m_indexBufferSize, D3D12_RESOURCE_STATE_INDEX_BUFFER)) {
+                return false;
+            }
+        }
+
+        m_needsUpload = false;
+        Platform::OutputDebugMessage("Mesh data uploaded successfully\n");
+        return true;
+    }
+    catch (const WindowsException& e) {
+        Platform::OutputDebugMessage("Error uploading mesh data: " + e.GetMessage());
         return false;
     }
 }

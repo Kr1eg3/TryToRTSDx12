@@ -652,15 +652,19 @@ bool DX12Renderer::CreateBuffer(uint64 size, D3D12_HEAP_TYPE heapType, D3D12_RES
         bufferDesc.SampleDesc.Count = 1;
         bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
+        // For default heap, start in COMMON state (D3D12 requirement)
+        D3D12_RESOURCE_STATES creationState = (heapType == D3D12_HEAP_TYPE_DEFAULT) ?
+            D3D12_RESOURCE_STATE_COMMON : initialState;
+
         THROW_IF_FAILED(m_device->CreateCommittedResource(
             &heapProps,
             D3D12_HEAP_FLAG_NONE,
             &bufferDesc,
-            initialState,
+            creationState,
             nullptr,
             IID_PPV_ARGS(&buffer)), "Create buffer");
 
-        // If data is provided and we need an upload buffer
+        // If data is provided and we need an upload buffer, create it but don't copy yet
         if (data && heapType == D3D12_HEAP_TYPE_DEFAULT && uploadBuffer) {
             D3D12_HEAP_PROPERTIES uploadHeapProps = {};
             uploadHeapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -673,32 +677,61 @@ bool DX12Renderer::CreateBuffer(uint64 size, D3D12_HEAP_TYPE heapType, D3D12_RES
                 nullptr,
                 IID_PPV_ARGS(uploadBuffer->GetAddressOf())), "Create upload buffer");
 
-            // Map and copy data
+            // Map and copy data to upload buffer
             void* mappedData;
             D3D12_RANGE readRange = { 0, 0 };
-            THROW_IF_FAILED((*uploadBuffer)->Map(0, &readRange, &mappedData), "Map upload buffer");
+            THROW_IF_FAILED(uploadBuffer->Get()->Map(0, &readRange, &mappedData), "Map upload buffer");
             memcpy(mappedData, data, size);
-			uploadBuffer->Get()->Unmap(0, nullptr);
+            uploadBuffer->Get()->Unmap(0, nullptr);
 
-            // Copy from upload buffer to default buffer
-            m_commandList->CopyBufferRegion(buffer.Get(), 0, uploadBuffer->Get(), 0, size);
-
-            // Transition to appropriate state
-            if (initialState != D3D12_RESOURCE_STATE_COPY_DEST) {
-                D3D12_RESOURCE_BARRIER barrier = {};
-                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                barrier.Transition.pResource = buffer.Get();
-                barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-                barrier.Transition.StateAfter = initialState;
-                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                m_commandList->ResourceBarrier(1, &barrier);
-            }
+            // NOTE: We don't copy from upload to default buffer here because command list might be closed
+            // This will be done later when the command list is in recording state
         }
 
         return true;
     }
     catch (const WindowsException& e) {
         Platform::OutputDebugMessage("Error creating buffer: " + e.GetMessage());
+        return false;
+    }
+}
+
+// New method to copy upload buffer to default buffer (call this when command list is recording)
+bool DX12Renderer::CopyUploadToDefaultBuffer(ComPtr<ID3D12Resource>& defaultBuffer,
+                                             ComPtr<ID3D12Resource>& uploadBuffer,
+                                             uint64 size, D3D12_RESOURCE_STATES finalState) {
+    if (!defaultBuffer || !uploadBuffer) {
+        return false;
+    }
+
+    try {
+        // Transition default buffer to copy destination
+        D3D12_RESOURCE_BARRIER barrierToCopyDest = {};
+        barrierToCopyDest.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrierToCopyDest.Transition.pResource = defaultBuffer.Get();
+        barrierToCopyDest.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
+        barrierToCopyDest.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+        barrierToCopyDest.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &barrierToCopyDest);
+
+        // Copy from upload buffer to default buffer
+        m_commandList->CopyBufferRegion(defaultBuffer.Get(), 0, uploadBuffer.Get(), 0, size);
+
+        // Transition to final state
+        if (finalState != D3D12_RESOURCE_STATE_COPY_DEST) {
+            D3D12_RESOURCE_BARRIER barrierToFinal = {};
+            barrierToFinal.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barrierToFinal.Transition.pResource = defaultBuffer.Get();
+            barrierToFinal.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+            barrierToFinal.Transition.StateAfter = finalState;
+            barrierToFinal.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            m_commandList->ResourceBarrier(1, &barrierToFinal);
+        }
+
+        return true;
+    }
+    catch (const WindowsException& e) {
+        Platform::OutputDebugMessage("Error copying upload to default buffer: " + e.GetMessage());
         return false;
     }
 }
