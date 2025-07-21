@@ -37,6 +37,12 @@
     <Filter Include="Source Files\Rendering\Dx12">
       <UniqueIdentifier>{79488e3b-7969-43e1-af8b-efe9c46f32e2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Core\Entity">
+      <UniqueIdentifier>{594093ed-6043-4850-b8dd-52a9325e290e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Core\Scene">
+      <UniqueIdentifier>{8bc71b91-b627-46d8-9da6-471dd020712e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="WinMain.cpp">
@@ -68,6 +74,18 @@
     </ClCompile>
     <ClCompile Include="Source\Rendering\Camera.cpp">
       <Filter>Source Files\Rendering</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Core\Entity\Entity.cpp">
+      <Filter>Source Files\Core\Entity</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Core\Entity\TransformComponent.cpp">
+      <Filter>Source Files\Core\Entity</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Core\Entity\MeshComponent.cpp">
+      <Filter>Source Files\Core\Entity</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Core\Scene\Scene.cpp">
+      <Filter>Source Files\Core\Scene</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -103,6 +121,21 @@
     </ClInclude>
     <ClInclude Include="Source\Rendering\Camera.h">
       <Filter>Source Files\Rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Core\Entity\Component.h">
+      <Filter>Source Files\Core\Entity</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Core\Entity\Entity.h">
+      <Filter>Source Files\Core\Entity</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Core\Entity\MeshComponent.h">
+      <Filter>Source Files\Core\Entity</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Core\Entity\TransformComponent.h">
+      <Filter>Source Files\Core\Entity</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Core\Scene\Scene.h">
+      <Filter>Source Files\Core\Scene</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

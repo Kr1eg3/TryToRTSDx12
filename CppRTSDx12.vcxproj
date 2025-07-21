@@ -133,6 +133,10 @@
   <ItemGroup>
     <ClCompile Include="Source\Core\Application\Application.cpp" />
     <ClCompile Include="Source\Core\Application\Timer.cpp" />
+    <ClCompile Include="Source\Core\Entity\Entity.cpp" />
+    <ClCompile Include="Source\Core\Entity\MeshComponent.cpp" />
+    <ClCompile Include="Source\Core\Entity\TransformComponent.cpp" />
+    <ClCompile Include="Source\Core\Scene\Scene.cpp" />
     <ClCompile Include="Source\Platform\Windows\Win32Window.cpp" />
     <ClCompile Include="Source\Platform\Windows\WindowsPlatform.cpp" />
     <ClCompile Include="Source\Rendering\Camera.cpp" />
@@ -145,6 +149,11 @@
   <ItemGroup>
     <ClInclude Include="Source\Core\Application\Application.h" />
     <ClInclude Include="Source\Core\Application\Timer.h" />
+    <ClInclude Include="Source\Core\Entity\Component.h" />
+    <ClInclude Include="Source\Core\Entity\Entity.h" />
+    <ClInclude Include="Source\Core\Entity\MeshComponent.h" />
+    <ClInclude Include="Source\Core\Entity\TransformComponent.h" />
+    <ClInclude Include="Source\Core\Scene\Scene.h" />
     <ClInclude Include="Source\Core\Window\Window.h" />
     <ClInclude Include="Source\Platform\Windows\Win32Window.h" />
     <ClInclude Include="Source\Platform\Windows\WindowsPlatform.h" />
