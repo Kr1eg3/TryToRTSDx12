@@ -116,6 +116,7 @@ public:
         UploadMeshData(renderer);
 
         UpdateLightConstants();
+    // Кешируем transform компонент для производительности
 
         Scene::Render(renderer);
     }

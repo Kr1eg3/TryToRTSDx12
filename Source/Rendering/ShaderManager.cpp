@@ -42,11 +42,17 @@ void ShaderManager::Shutdown() {
 
     Platform::OutputDebugMessage("Shutting down ShaderManager...\n");
 
-    // Unmap constant buffers
-    if (m_modelConstantBuffer && m_mappedModelConstants) {
-        m_modelConstantBuffer->Unmap(0, nullptr);
-        m_mappedModelConstants = nullptr;
+    // Unmap multiple model constant buffers
+    for (uint32 i = 0; i < m_modelConstantBuffers.size(); ++i) {
+        if (m_modelConstantBuffers[i] && m_mappedModelConstants[i]) {
+            m_modelConstantBuffers[i]->Unmap(0, nullptr);
+            m_mappedModelConstants[i] = nullptr;
+        }
     }
+    m_modelConstantBuffers.clear();
+    m_mappedModelConstants.clear();
+
+    // Unmap other constant buffers
     if (m_viewConstantBuffer && m_mappedViewConstants) {
         m_viewConstantBuffer->Unmap(0, nullptr);
         m_mappedViewConstants = nullptr;
@@ -61,11 +67,11 @@ void ShaderManager::Shutdown() {
     m_basicMeshRootSignature.Reset();
     m_lightConstantBuffer.Reset();
     m_viewConstantBuffer.Reset();
-    m_modelConstantBuffer.Reset();
     m_cbvHeap.Reset();
     m_pixelShader.Reset();
     m_vertexShader.Reset();
 
+    m_currentObjectIndex = 0;
     m_initialized = false;
     Platform::OutputDebugMessage("ShaderManager shutdown complete\n");
 }
@@ -76,6 +82,7 @@ bool ShaderManager::CreateBasicMeshShaders() {
     // Create default shader code
     CreateDefaultShaderCode();
 
+    // Исправленный вершинный шейдер с правильным порядком матриц
     String vertexShaderCode = R"(
 cbuffer ModelConstants : register(b0)
 {
@@ -112,10 +119,13 @@ VertexOutput VSMain(VertexInput input)
 {
     VertexOutput output;
 
-    float4 worldPosition = mul(float4(input.Position, 1.0f), ModelMatrix);
+    // Исправленный порядок матриц для DirectX
+    float4 worldPosition = mul(ModelMatrix, float4(input.Position, 1.0f));
     output.WorldPosition = worldPosition.xyz;
-    output.Position = mul(worldPosition, ViewProjectionMatrix);
-    output.Normal = normalize(mul(input.Normal, (float3x3)NormalMatrix));
+    output.Position = mul(ViewProjectionMatrix, worldPosition);
+
+    // Исправленный порядок для нормалей
+    output.Normal = normalize(mul((float3x3)NormalMatrix, input.Normal));
     output.TexCoord = input.TexCoord;
     output.ViewDirection = normalize(CameraPosition - worldPosition.xyz);
 
@@ -245,16 +255,25 @@ bool ShaderManager::CreateConstantBuffers() {
     Platform::OutputDebugMessage("Creating constant buffers...\n");
 
     try {
-        // Create model constants buffer
-        if (!m_renderer->CreateConstantBuffer(sizeof(ModelConstants), m_modelConstantBuffer,
-                                             reinterpret_cast<void**>(&m_mappedModelConstants))) {
-            return false;
+        // Создаем множественные model constant buffers для поддержки нескольких объектов
+        m_modelConstantBuffers.resize(MAX_OBJECTS);
+        m_mappedModelConstants.resize(MAX_OBJECTS);
+
+        for (uint32 i = 0; i < MAX_OBJECTS; ++i) {
+            if (!m_renderer->CreateConstantBuffer(sizeof(ModelConstants),
+                                                 m_modelConstantBuffers[i],
+                                                 reinterpret_cast<void**>(&m_mappedModelConstants[i]))) {
+                Platform::OutputDebugMessage("Failed to create model constant buffer " + std::to_string(i) + "\n");
+                return false;
+            }
+            m_renderer->SetDebugName(m_modelConstantBuffers[i].Get(),
+                                   "Model Constants Buffer " + std::to_string(i));
         }
-        m_renderer->SetDebugName(m_modelConstantBuffer.Get(), "Model Constants Buffer");
 
         // Create view constants buffer
         if (!m_renderer->CreateConstantBuffer(sizeof(ViewConstants), m_viewConstantBuffer,
                                              reinterpret_cast<void**>(&m_mappedViewConstants))) {
+            Platform::OutputDebugMessage("Failed to create view constant buffer\n");
             return false;
         }
         m_renderer->SetDebugName(m_viewConstantBuffer.Get(), "View Constants Buffer");
@@ -262,11 +281,13 @@ bool ShaderManager::CreateConstantBuffers() {
         // Create light constants buffer
         if (!m_renderer->CreateConstantBuffer(sizeof(LightConstants), m_lightConstantBuffer,
                                              reinterpret_cast<void**>(&m_mappedLightConstants))) {
+            Platform::OutputDebugMessage("Failed to create light constant buffer\n");
             return false;
         }
         m_renderer->SetDebugName(m_lightConstantBuffer.Get(), "Light Constants Buffer");
 
-        Platform::OutputDebugMessage("Constant buffers created successfully\n");
+        Platform::OutputDebugMessage("Constant buffers created successfully (Model buffers: " +
+                                    std::to_string(MAX_OBJECTS) + ")\n");
         return true;
     }
     catch (const WindowsException& e) {
@@ -293,9 +314,9 @@ bool ShaderManager::CreateBasicMeshPSO() {
         psoDesc.VS = { m_vertexShader->GetBufferPointer(), m_vertexShader->GetBufferSize() };
         psoDesc.PS = { m_pixelShader->GetBufferPointer(), m_pixelShader->GetBufferSize() };
 
-        // Rasterizer state
-        psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME; // D3D12_FILL_MODE_SOLID
-        psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE; // D3D12_CULL_MODE_BACK
+        // Rasterizer state - изменено на solid fill для лучшей визуализации
+        psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID; // Было WIREFRAME
+        psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;  // Включен back-face culling
         psoDesc.RasterizerState.FrontCounterClockwise = FALSE;
         psoDesc.RasterizerState.DepthBias = 0;
         psoDesc.RasterizerState.DepthBiasClamp = 0.0f;
@@ -344,24 +365,55 @@ bool ShaderManager::CreateBasicMeshPSO() {
     }
 }
 
+uint32 ShaderManager::BeginObjectRender() {
+    if (!m_initialized) return 0;
+
+    uint32 objectIndex = m_currentObjectIndex;
+    m_currentObjectIndex = (m_currentObjectIndex + 1) % MAX_OBJECTS;
+
+    return objectIndex;
+}
+
 void ShaderManager::BindForMeshRendering(ID3D12GraphicsCommandList* commandList) {
-    if (!commandList || !m_initialized) return;
+    // Старая версия метода - используем первый объект по умолчанию
+    BindForMeshRendering(commandList, 0);
+}
+
+void ShaderManager::BindForMeshRendering(ID3D12GraphicsCommandList* commandList, uint32 objectIndex) {
+    if (!commandList || !m_initialized || objectIndex >= MAX_OBJECTS) {
+        Platform::OutputDebugMessage("Invalid parameters for BindForMeshRendering: objectIndex=" +
+                                    std::to_string(objectIndex) + "\n");
+        return;
+    }
 
     // Set pipeline state and root signature
     commandList->SetPipelineState(m_basicMeshPSO.Get());
     commandList->SetGraphicsRootSignature(m_basicMeshRootSignature.Get());
 
-    // Bind constant buffers
-    commandList->SetGraphicsRootConstantBufferView(0, m_modelConstantBuffer->GetGPUVirtualAddress());
-    commandList->SetGraphicsRootConstantBufferView(1, m_viewConstantBuffer->GetGPUVirtualAddress());
-    commandList->SetGraphicsRootConstantBufferView(2, m_lightConstantBuffer->GetGPUVirtualAddress());
+    // Bind constant buffers - используем специфичный для объекта model buffer
+    commandList->SetGraphicsRootConstantBufferView(0,
+        m_modelConstantBuffers[objectIndex]->GetGPUVirtualAddress());
+    commandList->SetGraphicsRootConstantBufferView(1,
+        m_viewConstantBuffer->GetGPUVirtualAddress());
+    commandList->SetGraphicsRootConstantBufferView(2,
+        m_lightConstantBuffer->GetGPUVirtualAddress());
 }
 
 void ShaderManager::UpdateModelConstants(const DirectX::XMMATRIX& modelMatrix) {
-    if (!m_mappedModelConstants) return;
+    // Старая версия метода - обновляем первый объект по умолчанию
+    UpdateModelConstants(modelMatrix, 0);
+}
 
-    m_mappedModelConstants->modelMatrix = DirectX::XMMatrixTranspose(modelMatrix);
-    m_mappedModelConstants->normalMatrix = DirectX::XMMatrixTranspose(
+void ShaderManager::UpdateModelConstants(const DirectX::XMMATRIX& modelMatrix, uint32 objectIndex) {
+    if (objectIndex >= MAX_OBJECTS || !m_mappedModelConstants[objectIndex]) {
+        Platform::OutputDebugMessage("Invalid objectIndex for UpdateModelConstants: " +
+                                    std::to_string(objectIndex) + "\n");
+        return;
+    }
+
+    // Транспонируем матрицы для HLSL
+    m_mappedModelConstants[objectIndex]->modelMatrix = DirectX::XMMatrixTranspose(modelMatrix);
+    m_mappedModelConstants[objectIndex]->normalMatrix = DirectX::XMMatrixTranspose(
         DirectX::XMMatrixInverse(nullptr, modelMatrix));
 }
 
