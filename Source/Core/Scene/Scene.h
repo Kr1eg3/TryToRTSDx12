@@ -7,9 +7,8 @@
 #include <memory>
 #include <unordered_map>
 
-// Forward declarations
-class Renderer;    // Используем базовый класс вместо DX12Renderer
-class DX12Renderer; // Для совместимости с существующим кодом
+class Renderer;
+class DX12Renderer;
 class ShaderManager;
 
 class Scene {
@@ -35,7 +34,7 @@ public:
     virtual void BeginPlay();
     virtual void EndPlay();
     virtual void Update(float deltaTime);
-    
+
     // Перегрузки для совместимости
     virtual void Render(Renderer* renderer);
     virtual void Render(DX12Renderer* renderer); // Обратная совместимость

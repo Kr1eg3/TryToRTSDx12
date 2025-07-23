@@ -312,8 +312,8 @@ bool ShaderManager::CreateBasicMeshPSO() {
         psoDesc.VS = { m_vertexShader->GetBufferPointer(), m_vertexShader->GetBufferSize() };
         psoDesc.PS = { m_pixelShader->GetBufferPointer(), m_pixelShader->GetBufferSize() };
 
-        psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID; // Было WIREFRAME
-        psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;  // Включен back-face culling
+        psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME; // Было WIREFRAME
+        psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_FRONT;  // Включен back-face culling
         psoDesc.RasterizerState.FrontCounterClockwise = FALSE;
         psoDesc.RasterizerState.DepthBias = 0;
         psoDesc.RasterizerState.DepthBiasClamp = 0.0f;
