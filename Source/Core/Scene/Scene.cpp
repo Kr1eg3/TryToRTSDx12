@@ -1,9 +1,11 @@
 #include "Scene.h"
 #include "../Entity/Entity.h"
 #include "../Entity/TransformComponent.h"
+#include "../Entity/MeshComponent.h"
 #include "../../Platform/Windows/WindowsPlatform.h"
 #include "../../Rendering/Renderer.h"
 #include "../../Rendering/Dx12/DX12Renderer.h"
+#include "../../Rendering/RHI/IRHIContext.h"
 
 Scene::Scene() {
     Platform::OutputDebugMessage("Scene created\n");
@@ -132,6 +134,22 @@ void Scene::Render(DX12Renderer* renderer) {
     for (auto& entity : m_entities) {
         if (entity && entity->IsActive()) {
             entity->Render(renderer);
+        }
+    }
+}
+
+void Scene::Render(IRHIContext& context) {
+    if (!m_isActive) return;
+
+    // Render all active entities using new RHI system
+    for (auto& entity : m_entities) {
+        if (entity && entity->IsActive()) {
+            // TODO: Add entity->Render(context) when Entity class is updated
+            // For now, we'll need to get MeshComponent directly
+            auto* meshComponent = entity->GetComponent<MeshComponent>();
+            if (meshComponent) {
+                meshComponent->Render(context);
+            }
         }
     }
 }

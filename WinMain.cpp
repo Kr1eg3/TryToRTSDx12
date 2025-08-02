@@ -5,14 +5,15 @@
 #include "Source/Core/Entity/MeshComponent.h"
 #include "Source/Core/Entity/TransformComponent.h"
 #include "Source/Rendering/Dx12/DX12Renderer.h"
-#include "Source/Rendering/ShaderManager.h"
+#include "Source/Rendering/Material.h"
+#include "Source/Rendering/Bindable/Texture.h"
 #include <DirectXMath.h>
 
 class GameScene : public Scene {
 private:
-    UniquePtr<ShaderManager> m_shaderManager;
     Entity* m_cubeEntity = nullptr;
     Entity* m_secondCube = nullptr;
+    Entity* m_lightSphere = nullptr;
     float m_rotationSpeed = 1.0f;
 
 public:
@@ -28,28 +29,15 @@ public:
         Platform::OutputDebugMessage("GameScene: Initialized successfully\n");
     }
 
-    bool InitializeShaders(DX12Renderer* renderer) {
-        Platform::OutputDebugMessage("GameScene: Initializing shaders...\n");
-
-        m_shaderManager = std::make_unique<ShaderManager>();
-        if (!m_shaderManager->Initialize(renderer)) {
-            Platform::OutputDebugMessage("GameScene: Failed to initialize shader manager\n");
-            return false;
-        }
-
-        SetShaderManager(m_shaderManager.get());
-
-        Platform::OutputDebugMessage("GameScene: Shaders initialized successfully\n");
-        return true;
-    }
 
     void BeginPlay() override {
         Platform::OutputDebugMessage("GameScene: Begin play...\n");
 
         Scene::BeginPlay();
 
+        // Create first textured cube with bricks.dds
         m_cubeEntity = SpawnEntity<Entity>();
-        m_cubeEntity->SetName("Rotating Cube");
+        m_cubeEntity->SetName("Textured Cube (bricks.dds)");
 
         auto transform = m_cubeEntity->GetComponent<TransformComponent>();
         transform->SetPosition(0.0f, 0.0f, 0.0f);
@@ -57,8 +45,9 @@ public:
 
         auto meshComp = m_cubeEntity->AddComponent<MeshComponent>();
 
+        // Create second textured cube with bricks2.dds
         m_secondCube = SpawnEntity<Entity>();
-        m_secondCube->SetName("Static Cube");
+        m_secondCube->SetName("Textured Cube (bricks2.dds)");
 
         auto transform2 = m_secondCube->GetComponent<TransformComponent>();
         transform2->SetPosition(4.0f, 0.0f, 0.0f);
@@ -66,12 +55,23 @@ public:
 
         auto meshComp2 = m_secondCube->AddComponent<MeshComponent>();
 
-        Platform::OutputDebugMessage("GameScene: Entities created successfully\n");
+        // Create light sphere at light position (5.0f, 8.0f, -3.0f)
+        m_lightSphere = SpawnEntity<Entity>();
+        m_lightSphere->SetName("Light Source Sphere");
+
+        auto lightTransform = m_lightSphere->GetComponent<TransformComponent>();
+        lightTransform->SetPosition(5.0f, 8.0f, -3.0f);
+        lightTransform->SetScale(0.3f); // Small sphere
+
+        auto lightMeshComp = m_lightSphere->AddComponent<MeshComponent>();
+
+        Platform::OutputDebugMessage("GameScene: Textured entities and light sphere created successfully\n");
     }
 
     bool SetupMeshes(DX12Renderer* renderer) {
         Platform::OutputDebugMessage("GameScene: Setting up meshes...\n");
 
+        // Create cube meshes for all entities
         for (auto& entity : GetEntities()) {
             auto meshComp = entity->GetComponent<MeshComponent>();
             if (meshComp) {
@@ -82,7 +82,49 @@ public:
             }
         }
 
-        Platform::OutputDebugMessage("GameScene: Meshes setup successfully\n");
+        // Create simple colored materials without textures for now
+        if (m_cubeEntity) {
+            auto meshComp = m_cubeEntity->GetComponent<MeshComponent>();
+            if (meshComp) {
+                // Create red unlit material for first cube
+                auto material = Material::CreateUnlit(*renderer, {1.0f, 0.0f, 0.0f, 1.0f}, "RedMaterial");
+                meshComp->SetMaterial(material);
+                Platform::OutputDebugMessage("Applied red material to first cube\n");
+            }
+        }
+
+        if (m_secondCube) {
+            auto meshComp2 = m_secondCube->GetComponent<MeshComponent>();
+            if (meshComp2) {
+                // Create blue unlit material for second cube
+                auto material = Material::CreateUnlit(*renderer, {0.0f, 0.0f, 1.0f, 1.0f}, "BlueMaterial");
+                meshComp2->SetMaterial(material);
+                Platform::OutputDebugMessage("Applied blue material to second cube\n");
+            }
+        }
+
+        // Setup light sphere
+        if (m_lightSphere) {
+            auto lightMeshComp = m_lightSphere->GetComponent<MeshComponent>();
+            if (lightMeshComp) {
+                // Create sphere mesh
+                if (!lightMeshComp->CreateSphere(renderer, 12, 16)) {
+                    Platform::OutputDebugMessage("GameScene: Failed to create light sphere mesh\n");
+                    return false;
+                }
+                
+                // Create material with light color (1.0f, 0.95f, 0.8f) - warm white
+                auto material = Material::CreateUnlit(*renderer, {1.0f, 0.95f, 0.8f, 1.0f}, "LightMaterial");
+                lightMeshComp->SetMaterial(material);
+                Platform::OutputDebugMessage("Applied light-colored material to light sphere\n");
+            }
+        }
+
+        // Now force upload all textures
+        Platform::OutputDebugMessage("GameScene: Force uploading all textures...\n");
+        UploadTextureData(renderer);
+
+        Platform::OutputDebugMessage("GameScene: Meshes and textures setup successfully\n");
         return true;
     }
 
@@ -111,12 +153,14 @@ public:
     }
 
     void Render(DX12Renderer* renderer) override {
-        if (!renderer || !m_shaderManager) return;
+        if (!renderer) return;
+
+        // Reset object index for consistent material assignment
+        renderer->ResetObjectIndex();
 
         UploadMeshData(renderer);
 
-        UpdateLightConstants();
-    // Кешируем transform компонент для производительности
+        UpdateLightConstants(renderer);
 
         Scene::Render(renderer);
     }
@@ -142,12 +186,43 @@ private:
         }
     }
 
-    void UpdateLightConstants() {
-        DirectX::XMFLOAT3 lightDirection = { 0.3f, -0.7f, 0.6f };
+    void UpdateLightConstants(DX12Renderer* renderer) {
+        if (!renderer) return;
+        
+        // Point light position above and to the side of the scene
+        DirectX::XMFLOAT3 lightPosition = { 5.0f, 8.0f, -3.0f };
         DirectX::XMFLOAT3 lightColor = { 1.0f, 0.95f, 0.8f };
-        float lightIntensity = 1.2f;
+        float lightIntensity = 10.0f; // Increased intensity for point light
 
-        m_shaderManager->UpdateLightConstants(lightDirection, lightColor, lightIntensity);
+        static int frameCount = 0;
+        if (frameCount % 60 == 0) { // Debug every 60 frames
+            Platform::OutputDebugMessage("Light position: (" + 
+                std::to_string(lightPosition.x) + ", " + 
+                std::to_string(lightPosition.y) + ", " + 
+                std::to_string(lightPosition.z) + ")\n");
+        }
+        frameCount++;
+
+        // Update light constants through renderer
+        renderer->UpdateLightConstants(lightPosition, lightColor, lightIntensity);
+    }
+
+    void UploadTextureData(DX12Renderer* renderer) {
+        Platform::OutputDebugMessage("GameScene: Uploading texture data for all entities...\n");
+        
+        for (auto& entity : GetEntities()) {
+            auto meshComp = entity->GetComponent<MeshComponent>();
+            if (meshComp && meshComp->GetMaterial()) {
+                auto material = meshComp->GetMaterial();
+                auto texture = material->GetTexture("DiffuseTexture");
+                if (texture && texture->NeedsUpload()) {
+                    Platform::OutputDebugMessage("Uploading texture for entity: " + entity->GetName() + "\n");
+                    texture->ForceUpload();
+                }
+            }
+        }
+        
+        Platform::OutputDebugMessage("GameScene: All texture uploads completed\n");
     }
 };
 
@@ -176,7 +251,7 @@ private:
         config.rendererConfig.backBufferCount = 2;
         config.rendererConfig.vsyncEnabled = true;
 
-        // Camera settings - позиция для лучшего обзора двух кубов
+        // Camera settings
         config.cameraDesc.position = { 6.0f, 4.0f, -8.0f };
         config.cameraDesc.target = { 2.0f, 0.0f, 0.0f };
         config.cameraDesc.fovY = DirectX::XM_PIDIV4;
@@ -191,7 +266,7 @@ protected:
     bool OnInitialize() override {
         Platform::OutputDebugMessage("RTSApplication: Initializing...\n");
 
-        // Получаем DX12 renderer
+        // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ DX12 renderer
         DX12Renderer* dx12Renderer = static_cast<DX12Renderer*>(GetRenderer());
         if (!dx12Renderer) {
             Platform::OutputDebugMessage("RTSApplication: Failed to get DX12 renderer\n");
@@ -202,8 +277,9 @@ protected:
 
         m_gameScene->Initialize();
 
-        if (!m_gameScene->InitializeShaders(dx12Renderer)) {
-            Platform::OutputDebugMessage("RTSApplication: Failed to initialize scene shaders\n");
+        // Initialize rendering pipeline with integrated shader loading
+        if (!dx12Renderer->InitializeRenderingPipeline()) {
+            Platform::OutputDebugMessage("RTSApplication: Failed to initialize rendering pipeline\n");
             return false;
         }
 
@@ -215,11 +291,18 @@ protected:
         }
 
         Platform::OutputDebugMessage("RTSApplication: Initialized successfully!\n");
+        Platform::OutputDebugMessage("Textured cubes loaded automatically on startup!\n");
         Platform::OutputDebugMessage("Controls:\n");
         Platform::OutputDebugMessage("  WASD - Move camera\n");
         Platform::OutputDebugMessage("  Right mouse + drag - Look around\n");
         Platform::OutputDebugMessage("  Mouse wheel - Zoom\n");
         Platform::OutputDebugMessage("  R - Reset camera\n");
+        Platform::OutputDebugMessage("  F1 - Show entity count\n");
+        Platform::OutputDebugMessage("  F2 - Spawn new cube\n");
+        Platform::OutputDebugMessage("  F3 - Spawn colored cube\n");
+        Platform::OutputDebugMessage("  F4 - Spawn additional cube with bricks.dds texture\n");
+        Platform::OutputDebugMessage("  F5 - Spawn additional cube with bricks2.dds texture\n");
+        Platform::OutputDebugMessage("  T - Toggle wireframe mode\n");
         Platform::OutputDebugMessage("  ESC - Exit\n");
 
         return true;
@@ -254,12 +337,12 @@ protected:
         DX12Renderer* dx12Renderer = static_cast<DX12Renderer*>(GetRenderer());
         if (!dx12Renderer) return;
 
-        if (m_gameScene && m_gameScene->GetShaderManager() && GetCamera()) {
+        if (GetCamera()) {
             DirectX::XMMATRIX viewMatrix = GetCamera()->GetViewMatrix();
             DirectX::XMMATRIX projMatrix = GetCamera()->GetProjectionMatrix();
             DirectX::XMFLOAT3 cameraPosition = GetCamera()->GetPosition();
 
-            m_gameScene->GetShaderManager()->UpdateViewConstants(viewMatrix, projMatrix, cameraPosition);
+            dx12Renderer->UpdateViewConstants(viewMatrix, projMatrix, cameraPosition);
         }
 
         if (m_gameScene) {
@@ -298,6 +381,90 @@ protected:
                         meshComp->CreateCube(renderer);
 
                         Platform::OutputDebugMessage("Created new entity at runtime\n");
+                    }
+                    break;
+
+                case KeyCode::F3:
+                    if (m_gameScene) {
+                        auto newEntity = m_gameScene->SpawnEntity<Entity>();
+                        newEntity->SetName("Colored Cube " + std::to_string(m_gameScene->GetEntityCount()));
+
+                        auto transform = newEntity->GetComponent<TransformComponent>();
+                        float x = static_cast<float>((rand() % 10) - 5);
+                        float z = static_cast<float>((rand() % 10) - 5);
+                        transform->SetPosition(x, 2.0f, z);
+                        transform->SetScale(0.7f);
+
+                        auto meshComp = newEntity->AddComponent<MeshComponent>();
+                        DX12Renderer* renderer = static_cast<DX12Renderer*>(GetRenderer());
+                        meshComp->CreateCube(renderer);
+
+                        // Create a texture with random color for demonstration
+                        float r = static_cast<float>(rand()) / RAND_MAX;
+                        float g = static_cast<float>(rand()) / RAND_MAX;
+                        float b = static_cast<float>(rand()) / RAND_MAX;
+                        DirectX::XMFLOAT4 randomColor = {r, g, b, 1.0f};
+                        
+                        Platform::OutputDebugMessage("Created colored cube with color (" + 
+                                                    std::to_string(r) + ", " + 
+                                                    std::to_string(g) + ", " + 
+                                                    std::to_string(b) + ")\n");
+                    }
+                    break;
+
+                case KeyCode::F4:
+                    if (m_gameScene) {
+                        auto newEntity = m_gameScene->SpawnEntity<Entity>();
+                        newEntity->SetName("Textured Cube (bricks.dds)");
+
+                        auto transform = newEntity->GetComponent<TransformComponent>();
+                        float x = static_cast<float>((rand() % 10) - 5);
+                        float z = static_cast<float>((rand() % 10) - 5);
+                        transform->SetPosition(x, 3.0f, z);
+                        transform->SetScale(0.8f);
+
+                        auto meshComp = newEntity->AddComponent<MeshComponent>();
+                        DX12Renderer* renderer = static_cast<DX12Renderer*>(GetRenderer());
+                        meshComp->CreateCube(renderer);
+
+                        // Load and apply texture
+                        meshComp->SetTexture("Assets/Textures/bricks.dds", renderer);
+
+                        Platform::OutputDebugMessage("Created cube with bricks.dds texture\n");
+                    }
+                    break;
+
+                case KeyCode::F5:
+                    if (m_gameScene) {
+                        auto newEntity = m_gameScene->SpawnEntity<Entity>();
+                        newEntity->SetName("Textured Cube (bricks2.dds)");
+
+                        auto transform = newEntity->GetComponent<TransformComponent>();
+                        float x = static_cast<float>((rand() % 10) - 5);
+                        float z = static_cast<float>((rand() % 10) - 5);
+                        transform->SetPosition(x, 3.5f, z);
+                        transform->SetScale(0.9f);
+
+                        auto meshComp = newEntity->AddComponent<MeshComponent>();
+                        DX12Renderer* renderer = static_cast<DX12Renderer*>(GetRenderer());
+                        meshComp->CreateCube(renderer);
+
+                        // Load and apply texture
+                        meshComp->SetTexture("Assets/Textures/bricks2.dds", renderer);
+
+                        Platform::OutputDebugMessage("Created cube with bricks2.dds texture\n");
+                    }
+                    break;
+
+                case KeyCode::T:
+                    {
+                        DX12Renderer* dx12Renderer = static_cast<DX12Renderer*>(GetRenderer());
+                        if (dx12Renderer) {
+                            bool currentMode = dx12Renderer->IsWireframeMode();
+                            dx12Renderer->SetWireframeMode(!currentMode);
+                            Platform::OutputDebugMessage("Toggled wireframe mode to: " + 
+                                                        String(!currentMode ? "ON" : "OFF") + "\n");
+                        }
                     }
                     break;
             }

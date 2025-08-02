@@ -6,7 +6,6 @@
 
 // Forward declarations
 class DX12Renderer;
-class ShaderManager;
 class TransformComponent;
 
 class MeshComponent : public Component {
@@ -17,14 +16,24 @@ public:
     // Component lifecycle
     void Initialize() override;
     void Render(DX12Renderer* renderer) override;
+    void Render(class IRHIContext& context);
 
     // Mesh management
     void SetMesh(SharedPtr<Mesh> mesh);
     SharedPtr<Mesh> GetMesh() const { return m_mesh; }
     bool HasMesh() const { return m_mesh != nullptr; }
+    
+    // Material management
+    void SetMaterial(SharedPtr<class Material> material);
+    SharedPtr<class Material> GetMaterial() const { return m_material; }
+    bool HasMaterial() const { return m_material != nullptr; }
+    
+    // Texture shortcuts
+    void SetTexture(const String& texturePath, DX12Renderer* renderer);
 
     // Factory methods for common meshes
     bool CreateCube(DX12Renderer* renderer);
+    bool CreateSphere(DX12Renderer* renderer, uint32 stacks = 20, uint32 slices = 20);
     bool LoadFromFile(DX12Renderer* renderer, const String& filePath);
 
     // Rendering properties
@@ -41,6 +50,7 @@ public:
 
 private:
     SharedPtr<Mesh> m_mesh;
+    SharedPtr<class Material> m_material;
     bool m_isVisible = true;
     bool m_castsShadows = true;
     DirectX::XMFLOAT3 m_color = {1.0f, 1.0f, 1.0f}; // White by default

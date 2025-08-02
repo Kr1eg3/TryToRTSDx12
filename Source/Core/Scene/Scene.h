@@ -9,7 +9,6 @@
 
 class Renderer;
 class DX12Renderer;
-class ShaderManager;
 
 class Scene {
 public:
@@ -35,9 +34,10 @@ public:
     virtual void EndPlay();
     virtual void Update(float deltaTime);
 
-    // Перегрузки для совместимости
+    // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
     virtual void Render(Renderer* renderer);
-    virtual void Render(DX12Renderer* renderer); // Обратная совместимость
+    virtual void Render(DX12Renderer* renderer); // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+    virtual void Render(class IRHIContext& context); // пїЅпїЅпїЅпїЅпїЅ RHI пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
 
     // Scene properties
     const String& GetName() const { return m_name; }
@@ -46,9 +46,6 @@ public:
     bool IsActive() const { return m_isActive; }
     void SetActive(bool active) { m_isActive = active; }
 
-    // Shader manager access
-    void SetShaderManager(ShaderManager* shaderManager) { m_shaderManager = shaderManager; }
-    ShaderManager* GetShaderManager() const { return m_shaderManager; }
 
 protected:
     virtual void OnEntitySpawned(Entity* entity) {}
@@ -62,7 +59,6 @@ private:
     std::unordered_map<EntityID, Entity*> m_entityLookup;
 
     EntityID m_nextEntityID = 1;
-    ShaderManager* m_shaderManager = nullptr;
 
     // Internal helpers
     EntityID GenerateEntityID();

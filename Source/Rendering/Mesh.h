@@ -2,6 +2,7 @@
 
 #include "../Core/Utilities/Types.h"
 #include "../Platform/Windows/WindowsPlatform.h"
+#include "Bindable/BindableBase.h"
 #include <DirectXMath.h>
 
 // Vertex structure
@@ -26,11 +27,12 @@ public:
 
     // Create primitive meshes
     bool CreateCube(class DX12Renderer* renderer);
-    //bool CreateSphere(class DX12Renderer* renderer, uint32 stacks = 20, uint32 slices = 20);
+    bool CreateSphere(class DX12Renderer* renderer, uint32 stacks = 20, uint32 slices = 20);
     //bool CreatePlane(class DX12Renderer* renderer);
 
     // Rendering
     void Draw(ID3D12GraphicsCommandList* commandList);
+    void Bind(class IRHIContext& context);
 
     // Upload data when command list is recording
     bool UploadData(class DX12Renderer* renderer);
@@ -51,9 +53,13 @@ private:
     uint32 m_vertexCount = 0;
     uint32 m_indexCount = 0;
 
-    // D3D12 resources
-    ComPtr<ID3D12Resource> m_vertexBuffer;
-    ComPtr<ID3D12Resource> m_indexBuffer;
+    // Bindable objects
+    UniquePtr<VertexBuffer<Vertex>> m_vertexBuffer;
+    UniquePtr<IndexBuffer> m_indexBuffer;
+    
+    // Legacy D3D12 resources (for compatibility)
+    ComPtr<ID3D12Resource> m_legacyVertexBuffer;
+    ComPtr<ID3D12Resource> m_legacyIndexBuffer;
     ComPtr<ID3D12Resource> m_vertexBufferUpload;
     ComPtr<ID3D12Resource> m_indexBufferUpload;
 
@@ -68,6 +74,7 @@ private:
     // Helper methods
     bool CreateBuffers(class DX12Renderer* renderer);
     void CreateCubeVertices();
+    void CreateSphereVertices(uint32 stacks, uint32 slices);
 
     DECLARE_NON_COPYABLE(Mesh);
 };

@@ -1,5 +1,6 @@
 #include "Mesh.h"
 #include "Dx12/DX12Renderer.h"
+#include "RHI/DX12RHIContext.h"
 #include "../Platform/Windows/WindowsPlatform.h"
 
 #include <assimp/Importer.hpp>
@@ -188,30 +189,39 @@ bool Mesh::CreateBuffers(DX12Renderer* renderer) {
     try {
         Platform::OutputDebugMessage("Creating mesh buffers...\n");
 
+        // Create bindable objects
+        m_vertexBuffer = std::make_unique<VertexBuffer<Vertex>>(*renderer, m_vertices, "MeshVertexBuffer");
+        m_indexBuffer = std::make_unique<IndexBuffer>(*renderer, m_indices, "MeshIndexBuffer");
+        
+        if (!m_vertexBuffer->IsValid() || !m_indexBuffer->IsValid()) {
+            Platform::OutputDebugMessage("Failed to create bindable buffers\n");
+            return false;
+        }
+
+        // Legacy fallback - create old-style buffers for compatibility
         uint64 vertexBufferSize = m_vertices.size() * sizeof(Vertex);
         uint64 indexBufferSize = m_indices.size() * sizeof(uint32);
 
-        // Create vertex buffer (this will create both default and upload buffers)
         if (!renderer->CreateBuffer(vertexBufferSize, D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
-                                   m_vertexBuffer, m_vertices.data(), &m_vertexBufferUpload)) {
-            Platform::OutputDebugMessage("Failed to create vertex buffer\n");
+                                   m_legacyVertexBuffer, m_vertices.data(), &m_vertexBufferUpload)) {
+            Platform::OutputDebugMessage("Failed to create legacy vertex buffer\n");
             return false;
         }
 
         // Setup vertex buffer view
-        m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+        m_vertexBufferView.BufferLocation = m_legacyVertexBuffer->GetGPUVirtualAddress();
         m_vertexBufferView.StrideInBytes = sizeof(Vertex);
         m_vertexBufferView.SizeInBytes = static_cast<UINT>(vertexBufferSize);
 
         // Create index buffer (this will create both default and upload buffers)
         if (!renderer->CreateBuffer(indexBufferSize, D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_STATE_INDEX_BUFFER,
-                                   m_indexBuffer, m_indices.data(), &m_indexBufferUpload)) {
+                                   m_legacyIndexBuffer, m_indices.data(), &m_indexBufferUpload)) {
             Platform::OutputDebugMessage("Failed to create index buffer\n");
             return false;
         }
 
         // Setup index buffer view
-        m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+        m_indexBufferView.BufferLocation = m_legacyIndexBuffer->GetGPUVirtualAddress();
         m_indexBufferView.Format = DXGI_FORMAT_R32_UINT;
         m_indexBufferView.SizeInBytes = static_cast<UINT>(indexBufferSize);
 
@@ -236,16 +246,16 @@ bool Mesh::UploadData(DX12Renderer* renderer) {
 
     try {
         // Copy vertex buffer
-        if (m_vertexBuffer && m_vertexBufferUpload) {
-            if (!renderer->CopyUploadToDefaultBuffer(m_vertexBuffer, m_vertexBufferUpload,
+        if (m_legacyVertexBuffer && m_vertexBufferUpload) {
+            if (!renderer->CopyUploadToDefaultBuffer(m_legacyVertexBuffer, m_vertexBufferUpload,
                                                     m_vertexBufferSize, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER)) {
                 return false;
             }
         }
 
         // Copy index buffer
-        if (m_indexBuffer && m_indexBufferUpload) {
-            if (!renderer->CopyUploadToDefaultBuffer(m_indexBuffer, m_indexBufferUpload,
+        if (m_legacyIndexBuffer && m_indexBufferUpload) {
+            if (!renderer->CopyUploadToDefaultBuffer(m_legacyIndexBuffer, m_indexBufferUpload,
                                                     m_indexBufferSize, D3D12_RESOURCE_STATE_INDEX_BUFFER)) {
                 return false;
             }
@@ -273,4 +283,100 @@ void Mesh::Draw(ID3D12GraphicsCommandList* commandList) {
 
     // Draw indexed
     commandList->DrawIndexedInstanced(m_indexCount, 1, 0, 0, 0);
+}
+
+void Mesh::Bind(IRHIContext& context) {
+    if (!m_vertexBuffer || !m_indexBuffer || m_indexCount == 0) {
+        Platform::OutputDebugMessage("Warning: Attempting to bind invalid mesh\n");
+        return;
+    }
+
+    // Bind using new bindable system
+    m_vertexBuffer->Bind(context);
+    m_indexBuffer->Bind(context);
+    context.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+}
+
+bool Mesh::CreateSphere(DX12Renderer* renderer, uint32 stacks, uint32 slices) {
+    if (!renderer) {
+        Platform::OutputDebugMessage("Error: Renderer is null\n");
+        return false;
+    }
+
+    Platform::OutputDebugMessage("Creating sphere mesh with " + std::to_string(stacks) + 
+                                " stacks and " + std::to_string(slices) + " slices\n");
+
+    CreateSphereVertices(stacks, slices);
+
+    // Set vertex and index counts
+    m_vertexCount = static_cast<uint32>(m_vertices.size());
+    m_indexCount = static_cast<uint32>(m_indices.size());
+
+    Platform::OutputDebugMessage("Sphere has " + std::to_string(m_vertexCount) + 
+                                " vertices and " + std::to_string(m_indexCount) + " indices\n");
+
+    // Create D3D12 buffers
+    if (!CreateBuffers(renderer)) {
+        Platform::OutputDebugMessage("Failed to create sphere buffers\n");
+        return false;
+    }
+
+    m_needsUpload = true;
+    Platform::OutputDebugMessage("Sphere mesh created successfully\n");
+    return true;
+}
+
+void Mesh::CreateSphereVertices(uint32 stacks, uint32 slices) {
+    m_vertices.clear();
+    m_indices.clear();
+
+    const float PI = 3.14159265f;
+    const float radius = 1.0f;
+
+    // Generate vertices
+    for (uint32 stack = 0; stack <= stacks; ++stack) {
+        float phi = PI * stack / stacks; // From 0 to PI
+        float sinPhi = sin(phi);
+        float cosPhi = cos(phi);
+
+        for (uint32 slice = 0; slice <= slices; ++slice) {
+            float theta = 2.0f * PI * slice / slices; // From 0 to 2*PI
+            float sinTheta = sin(theta);
+            float cosTheta = cos(theta);
+
+            // Spherical coordinates to Cartesian
+            DirectX::XMFLOAT3 position;
+            position.x = radius * sinPhi * cosTheta;
+            position.y = radius * cosPhi;
+            position.z = radius * sinPhi * sinTheta;
+
+            // Normal is the same as position for unit sphere
+            DirectX::XMFLOAT3 normal = position;
+
+            // Texture coordinates
+            DirectX::XMFLOAT2 texCoord;
+            texCoord.x = static_cast<float>(slice) / slices;
+            texCoord.y = static_cast<float>(stack) / stacks;
+
+            m_vertices.emplace_back(position, normal, texCoord);
+        }
+    }
+
+    // Generate indices
+    for (uint32 stack = 0; stack < stacks; ++stack) {
+        for (uint32 slice = 0; slice < slices; ++slice) {
+            uint32 first = stack * (slices + 1) + slice;
+            uint32 second = first + slices + 1;
+
+            // First triangle
+            m_indices.push_back(first);
+            m_indices.push_back(second);
+            m_indices.push_back(first + 1);
+
+            // Second triangle
+            m_indices.push_back(second);
+            m_indices.push_back(second + 1);
+            m_indices.push_back(first + 1);
+        }
+    }
 }

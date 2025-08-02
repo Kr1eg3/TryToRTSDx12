@@ -40,6 +40,40 @@
 # debug information files
 *.dwo
 
-.vs/
+# Build directories
+build/
+out/
+bin/
+lib/
 
+# Visual Studio generated files
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+.vs/
+x64/
 CppRTSDx12/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+
+# IDE files
+.vscode/
+*.code-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.tlog
+*.log
+*.idb
